@@ -10,6 +10,7 @@ final class HotkeyRecorder: ObservableObject {
 struct HotkeyField: View {
     @Binding var hotkey: Hotkey
     @ObservedObject var rec: HotkeyRecorder
+    var allowPlain = false
 
     var body: some View {
         Button(rec.recording ? L.t("hk.press") : hotkey.display) {
@@ -23,14 +24,14 @@ struct HotkeyField: View {
         rec.recording = true
         Engine.shared.recordingHotkey = true
         rec.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
-            if e.keyCode == 53 { stop(); return nil } // Esc cancels
+            if e.keyCode == 53 && !allowPlain { stop(); return nil } // Esc cancels
             var f = CGEventFlags()
             if e.modifierFlags.contains(.command) { f.insert(.maskCommand) }
             if e.modifierFlags.contains(.option) { f.insert(.maskAlternate) }
             if e.modifierFlags.contains(.control) { f.insert(.maskControl) }
             if e.modifierFlags.contains(.shift) { f.insert(.maskShift) }
             let isF = KeyNames.special[e.keyCode]?.hasPrefix("F") ?? false
-            guard f.contains(.maskCommand) || f.contains(.maskAlternate) || f.contains(.maskControl) || isF else { return nil }
+            guard allowPlain || f.contains(.maskCommand) || f.contains(.maskAlternate) || f.contains(.maskControl) || isF else { return nil }
             hotkey = Hotkey(keyCode: e.keyCode, mods: f.rawValue)
             stop()
             return nil
@@ -54,9 +55,15 @@ final class SettingsUIState: ObservableObject {
     let recPause = HotkeyRecorder()
 }
 
+final class AIRecorders {
+    static let shared = AIRecorders()
+    let word = HotkeyRecorder(), all = HotkeyRecorder(), hide = HotkeyRecorder(), undo = HotkeyRecorder(), toggle = HotkeyRecorder()
+}
+
 struct AISection: View {
     @ObservedObject private var s = Settings.shared
     @ObservedObject private var ai = AIModel.shared
+    private let rec = AIRecorders.shared
 
     private var stateText: String {
         switch ai.state {
@@ -69,34 +76,78 @@ struct AISection: View {
         }
     }
 
+    private func applyEnabled(_ on: Bool) {
+        s.aiEnabled = on
+        if on { AIModel.shared.start() } else { AIModel.shared.stop(); Predictor.shared.hide() }
+    }
+
     var body: some View {
         Section(L.t("ai.title")) {
             Text(L.t("ai.explain")).font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            Toggle(L.t("ai.enable"), isOn: Binding(get: { s.aiEnabled }, set: { applyEnabled($0) }))
+            Picker(L.t("ai.mode"), selection: Binding(get: { s.aiMode }, set: { m in
+                s.aiMode = m
+                if m == .light { AIModel.shared.stop() } else if s.aiEnabled { AIModel.shared.start() }
+            })) {
+                Text(L.t("ai.mode.model")).tag(AIMode.model)
+                Text(L.t("ai.mode.light")).tag(AIMode.light)
+            }
+            if s.aiMode == .model {
+                HStack {
+                    Text(L.t("ai.model", AIModel.modelName)).font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    switch ai.state {
+                    case .notInstalled, .failed:
+                        Button(L.t("ai.download")) { ai.download() }
+                    case .downloading:
+                        Button(L.t("ai.cancel")) { ai.cancel() }
+                    default:
+                        Button(L.t("ai.remove"), role: .destructive) { ai.remove() }
+                    }
+                }
+                if case .downloading(let p) = ai.state { ProgressView(value: p) }
+                Text(stateText).font(.caption).foregroundStyle(.secondary)
+            }
+            Picker(L.t("ai.phrases"), selection: $s.aiPhrases) {
+                Text(L.t("ai.phrases.words")).tag(false)
+                Text(L.t("ai.phrases.all")).tag(true)
+            }
+            .pickerStyle(.segmented)
+            if s.aiPhrases {
+                Stepper("\(L.t("ai.length")): \(s.aiMaxWords)", value: $s.aiMaxWords, in: 2...15)
+            }
+            Stepper("\(L.t("ai.delay")): \(s.aiDelay)", value: $s.aiDelay, in: 100...1500, step: 50)
             HStack {
-                Toggle(L.t("ai.enable"), isOn: Binding(
-                    get: { s.aiEnabled },
-                    set: { on in
-                        s.aiEnabled = on
-                        if on { AIModel.shared.start() } else { AIModel.shared.stop(); Predictor.shared.hide() }
-                    }))
-                    .disabled(!ai.isInstalled)
+                Text(L.t("ai.langs"))
                 Spacer()
-                switch ai.state {
-                case .notInstalled, .failed:
-                    Button(L.t("ai.download")) { ai.download() }
-                case .downloading:
-                    Button(L.t("ai.cancel")) { ai.cancel() }
-                default:
-                    Button(L.t("ai.remove"), role: .destructive) { ai.remove() }
+                ForEach(Lang.allCases) { l in
+                    Toggle(l.short, isOn: Binding(
+                        get: { s.aiLangs.contains(l) },
+                        set: { on in if on { s.aiLangs.insert(l) } else { s.aiLangs.remove(l) } }))
                 }
             }
-            Picker(L.t("ai.tab"), selection: $s.tabAcceptsAll) {
-                Text(L.t("ai.tab.all")).tag(true)
-                Text(L.t("ai.tab.word")).tag(false)
+            Toggle(L.t("ai.personal"), isOn: $s.aiPersonalization)
+            Toggle(L.t("ai.learnPhrases"), isOn: $s.learnPhrases).disabled(!s.aiPersonalization)
+            Button(L.t("ai.clear")) { UserStore.shared.clearPersonalization() }
+            LabeledContent(L.t("hk.acceptWord")) { HotkeyField(hotkey: $s.hkAcceptWord, rec: rec.word, allowPlain: true) }
+            LabeledContent(L.t("hk.acceptAll")) { HotkeyField(hotkey: $s.hkAcceptAll, rec: rec.all, allowPlain: true) }
+            LabeledContent(L.t("hk.hide")) { HotkeyField(hotkey: $s.hkHide, rec: rec.hide, allowPlain: true) }
+            LabeledContent(L.t("hk.undoInsert")) { HotkeyField(hotkey: $s.hkUndoInsert, rec: rec.undo) }
+            LabeledContent(L.t("hk.toggleAI")) { HotkeyField(hotkey: $s.hkToggleAI, rec: rec.toggle) }
+        }
+        Section(L.t("ai.excluded")) {
+            ForEach(s.aiExcludedApps, id: \.self) { id in
+                HStack {
+                    Text(id.hasSuffix("*") ? id : SettingsView.appName(id))
+                    Text(id).foregroundStyle(.secondary).font(.caption)
+                    Spacer()
+                    Button(L.t("set.remove")) { s.aiExcludedApps.removeAll { $0 == id } }
+                }
             }
-            if case .downloading(let p) = ai.state { ProgressView(value: p) }
-            Text(stateText).font(.caption).foregroundStyle(.secondary)
+            Button(L.t("set.add")) {
+                for id in SettingsView.pickApps() where !s.aiExcludedApps.contains(id) { s.aiExcludedApps.append(id) }
+            }
         }
     }
 }
@@ -208,6 +259,20 @@ struct SettingsView: View {
     }
 
     private var installedLangs: [Lang] { Lang.allCases.filter { LayoutManager.shared.layouts[$0] != nil } }
+
+    static func pickApps() -> [String] {
+        let p = NSOpenPanel()
+        p.allowedContentTypes = [.application]
+        p.directoryURL = URL(fileURLWithPath: "/Applications")
+        p.allowsMultipleSelection = true
+        guard p.runModal() == .OK else { return [] }
+        return p.urls.compactMap { Bundle(url: $0)?.bundleIdentifier }
+    }
+
+    static func appName(_ id: String) -> String {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else { return id }
+        return FileManager.default.displayName(atPath: url.path)
+    }
 
     private func appName(_ id: String) -> String {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else { return id }

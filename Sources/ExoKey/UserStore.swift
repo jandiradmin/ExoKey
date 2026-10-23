@@ -2,11 +2,11 @@ import Foundation
 import SQLite3
 
 enum EntryKind: String, CaseIterable, Codable, Identifiable {
-    case word, exception, rule, candidate
+    case word, exception, rule, candidate, phrase, banned
     var id: String { rawValue }
 }
 
-enum EntrySource: String, Codable { case manual, learned }
+enum EntrySource: String, Codable { case manual, learned, accepted }
 
 struct UserEntry: Identifiable, Codable, Hashable {
     var id: Int64 = 0
@@ -56,6 +56,7 @@ final class UserStore: ObservableObject {
           created REAL NOT NULL, last_used REAL NOT NULL, source TEXT NOT NULL,
           UNIQUE(kind, lang, word));
         """)
+        exec("CREATE TABLE IF NOT EXISTS ngrams(key TEXT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0)")
     }
 
     @discardableResult
@@ -151,6 +152,52 @@ final class UserStore: ObservableObject {
     func resetLearning() {
         exec("DELETE FROM entries WHERE source='learned'; UPDATE entries SET uses=0, undos=0;")
         load()
+    }
+
+    // MARK: n-gram counters (phrases typed / suggestions accepted / rejected) — no reload, cheap
+
+    private var ngramCache: [String: Int]?
+
+    /// Increments a counter and returns the new value.
+    @discardableResult
+    func bump(_ key: String) -> Int {
+        if ngramCache == nil { loadNgrams() }
+        let n = (ngramCache?[key] ?? 0) + 1
+        ngramCache?[key] = n
+        var st: OpaquePointer?
+        if sqlite3_prepare_v2(db, "INSERT INTO ngrams(key,count) VALUES(?,1) ON CONFLICT(key) DO UPDATE SET count=count+1", -1, &st, nil) == SQLITE_OK {
+            bind(st, 1, key)
+            sqlite3_step(st)
+        }
+        sqlite3_finalize(st)
+        return n
+    }
+
+    private func loadNgrams() {
+        var m: [String: Int] = [:]
+        var st: OpaquePointer?
+        if sqlite3_prepare_v2(db, "SELECT key,count FROM ngrams", -1, &st, nil) == SQLITE_OK {
+            while sqlite3_step(st) == SQLITE_ROW {
+                if let k = sqlite3_column_text(st, 0) { m[String(cString: k)] = Int(sqlite3_column_int(st, 1)) }
+            }
+        }
+        sqlite3_finalize(st)
+        ngramCache = m
+    }
+
+    /// Clears personalization of autocomplete: learned/accepted phrases and counters.
+    func clearPersonalization() {
+        exec("DELETE FROM ngrams; DELETE FROM entries WHERE kind IN ('phrase','banned') AND source != 'manual';")
+        ngramCache = [:]
+        load()
+    }
+
+    var phrases: [UserEntry] { entries.filter { $0.kind == .phrase } }
+    var banned: [UserEntry] { entries.filter { $0.kind == .banned } }
+
+    /// User dictionary words starting with prefix, most used first.
+    func userCompletions(_ prefix: String, _ l: Lang) -> [String] {
+        (wordsByLang[l] ?? []).filter { $0.hasPrefix(prefix) && $0 != prefix }
     }
 
     private var lastError: String { db.map { String(cString: sqlite3_errmsg($0)) } ?? "no database" }

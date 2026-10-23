@@ -44,6 +44,11 @@ enum AddMode: String, CaseIterable, Codable, Identifiable {
     var id: String { rawValue }
 }
 
+enum AIMode: String, CaseIterable, Codable, Identifiable {
+    case model, light
+    var id: String { rawValue }
+}
+
 enum UILang: String, CaseIterable, Codable, Identifiable {
     case system, ru, uk, en
     var id: String { rawValue }
@@ -64,7 +69,19 @@ final class Settings: ObservableObject {
     @Published var uiLang: UILang { didSet { d.set(uiLang.rawValue, forKey: "uiLang") } }
     @Published var excludedApps: [String] { didSet { d.set(excludedApps, forKey: "excludedApps") } }
     @Published var aiEnabled: Bool { didSet { d.set(aiEnabled, forKey: "aiEnabled") } }
-    @Published var tabAcceptsAll: Bool { didSet { d.set(tabAcceptsAll, forKey: "tabAcceptsAll") } }
+    @Published var aiMode: AIMode { didSet { d.set(aiMode.rawValue, forKey: "aiMode") } }
+    @Published var aiPhrases: Bool { didSet { d.set(aiPhrases, forKey: "aiPhrases") } }
+    @Published var aiMaxWords: Int { didSet { d.set(aiMaxWords, forKey: "aiMaxWords") } }
+    @Published var aiDelay: Int { didSet { d.set(aiDelay, forKey: "aiDelay") } }
+    @Published var aiLangs: Set<Lang> { didSet { d.set(aiLangs.map(\.rawValue), forKey: "aiLangs") } }
+    @Published var aiExcludedApps: [String] { didSet { d.set(aiExcludedApps, forKey: "aiExcludedApps") } }
+    @Published var aiPersonalization: Bool { didSet { d.set(aiPersonalization, forKey: "aiPersonalization") } }
+    @Published var learnPhrases: Bool { didSet { d.set(learnPhrases, forKey: "learnPhrases") } }
+    @Published var hkAcceptWord: Hotkey { didSet { save(hkAcceptWord, "hkAcceptWord") } }
+    @Published var hkAcceptAll: Hotkey { didSet { save(hkAcceptAll, "hkAcceptAll") } }
+    @Published var hkHide: Hotkey { didSet { save(hkHide, "hkHide") } }
+    @Published var hkUndoInsert: Hotkey { didSet { save(hkUndoInsert, "hkUndoInsert") } }
+    @Published var hkToggleAI: Hotkey { didSet { save(hkToggleAI, "hkToggleAI") } }
     @Published var skipAllCaps: Bool { didSet { d.set(skipAllCaps, forKey: "skipAllCaps") } }
     var firstRunDone: Bool {
         get { d.bool(forKey: "firstRunDone") }
@@ -85,7 +102,12 @@ final class Settings: ObservableObject {
             "repeatCount": 3, "undosToException": 2, "notifications": true, "uiLang": UILang.system.rawValue,
             "excludedApps": ["com.apple.Terminal", "com.googlecode.iterm2", "com.apple.keychainaccess"],
             "activeLangs": ["en", "ru", "uk"],
-            "aiEnabled": false, "tabAcceptsAll": true, "skipAllCaps": true,
+            "aiEnabled": false, "aiMode": AIMode.model.rawValue, "aiPhrases": true, "aiMaxWords": 8, "aiDelay": 250,
+            "aiLangs": ["en", "ru", "uk"], "aiPersonalization": true, "learnPhrases": false,
+            "aiExcludedApps": ["com.apple.Terminal", "com.googlecode.iterm2", "com.microsoft.VSCode",
+                               "com.todesktop.230313mzl4w4u92", "com.apple.dt.Xcode", "dev.zed.Zed", "dev.warp.Warp-Stable",
+                               "com.mitchellh.ghostty", "net.kovidgoyal.kitty", "org.alacritty", "com.sublimetext.4",
+                               "com.jetbrains.*", "com.apple.keychainaccess"], "skipAllCaps": true,
             "calculator": true, "learnNames": true, "implicitUndo": true,
         ])
         enabled = d.bool(forKey: "enabled")
@@ -100,7 +122,14 @@ final class Settings: ObservableObject {
         excludedApps = d.stringArray(forKey: "excludedApps") ?? []
         aiEnabled = d.bool(forKey: "aiEnabled")
         skipAllCaps = d.bool(forKey: "skipAllCaps")
-        tabAcceptsAll = d.bool(forKey: "tabAcceptsAll")
+        aiMode = AIMode(rawValue: d.string(forKey: "aiMode") ?? "") ?? .model
+        aiPhrases = d.bool(forKey: "aiPhrases")
+        aiMaxWords = d.integer(forKey: "aiMaxWords")
+        aiDelay = d.integer(forKey: "aiDelay")
+        aiLangs = Set((d.stringArray(forKey: "aiLangs") ?? []).compactMap(Lang.init(rawValue:)))
+        aiExcludedApps = d.stringArray(forKey: "aiExcludedApps") ?? []
+        aiPersonalization = d.bool(forKey: "aiPersonalization")
+        learnPhrases = d.bool(forKey: "learnPhrases")
         calculator = d.bool(forKey: "calculator")
         learnNames = d.bool(forKey: "learnNames")
         implicitUndo = d.bool(forKey: "implicitUndo")
@@ -109,6 +138,15 @@ final class Settings: ObservableObject {
         hkUndo = Self.load(d, "hkUndo") ?? Hotkey(keyCode: 6, mods: ctrlOpt)      // ⌃⌥Z
         hkConvert = Self.load(d, "hkConvert") ?? Hotkey(keyCode: 7, mods: ctrlOpt) // ⌃⌥X
         hkPause = Self.load(d, "hkPause") ?? Hotkey(keyCode: 35, mods: ctrlOpt)    // ⌃⌥P
+        hkAcceptWord = Self.load(d, "hkAcceptWord") ?? Hotkey(keyCode: 48, mods: 0) // Tab
+        hkAcceptAll = Self.load(d, "hkAcceptAll") ?? Hotkey(keyCode: 48, mods: CGEventFlags.maskShift.rawValue) // ⇧Tab
+        hkHide = Self.load(d, "hkHide") ?? Hotkey(keyCode: 53, mods: 0)            // Esc
+        hkUndoInsert = Self.load(d, "hkUndoInsert") ?? Hotkey(keyCode: 51, mods: ctrlOpt) // ⌃⌥⌫
+        hkToggleAI = Self.load(d, "hkToggleAI") ?? Hotkey(keyCode: 0, mods: ctrlOpt)      // ⌃⌥A
+    }
+
+    func isAIExcluded(_ bundleID: String) -> Bool {
+        aiExcludedApps.contains { $0.hasSuffix("*") ? bundleID.hasPrefix(String($0.dropLast())) : $0 == bundleID }
     }
 
     private func save(_ h: Hotkey, _ k: String) { d.set(try? JSONEncoder().encode(h), forKey: k) }

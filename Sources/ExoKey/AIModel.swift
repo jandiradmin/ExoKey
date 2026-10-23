@@ -133,7 +133,7 @@ final class AIModel: NSObject, ObservableObject, URLSessionDownloadDelegate {
     // MARK: Server
 
     func start() {
-        guard isInstalled, process == nil, let bin = serverBinary else { return }
+        guard Settings.shared.aiMode == .model, isInstalled, process == nil, let bin = serverBinary else { return }
         state = .starting
         // kill a server left over from a previous ExoKey run
         let k = Process()
@@ -192,18 +192,21 @@ final class AIModel: NSObject, ObservableObject, URLSessionDownloadDelegate {
 
     // MARK: Completion
 
-    func complete(_ prompt: String, completion: @escaping (String?) -> Void) {
-        guard state == .ready else { completion(nil); return }
+    /// Returns (text, cutByTokenLimit).
+    func complete(_ prompt: String, maxTokens: Int = 28, completion: @escaping (String?, Bool) -> Void) {
+        guard state == .ready else { completion(nil, false); return }
         var req = URLRequest(url: URL(string: "http://127.0.0.1:\(Self.port)/completion")!)
         req.httpMethod = "POST"
         req.timeoutInterval = 3
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let body: [String: Any] = ["prompt": prompt, "n_predict": 28, "temperature": 0,
+        let body: [String: Any] = ["prompt": prompt, "n_predict": maxTokens, "temperature": 0,
                                    "cache_prompt": true, "stop": ["\n"]]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
         URLSession.shared.dataTask(with: req) { data, _, _ in
-            let text = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["content"] as? String
-            DispatchQueue.main.async { completion(text) }
+            let obj = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+            let text = obj?["content"] as? String
+            let limit = (obj?["stopped_limit"] as? Bool) == true || (obj?["stop_type"] as? String) == "limit"
+            DispatchQueue.main.async { completion(text, limit) }
         }.resume()
     }
 }

@@ -39,7 +39,7 @@ private func keyTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CG
     case .keyDown:
         if Injector.isOwn(event) { return Unmanaged.passUnretained(event) }
         if Engine.shared.keyDown(event) == .swallow {
-            if !Injector.lastWasAccept { DispatchQueue.main.async { Predictor.shared.keyTyped(nil) } }
+            if !Injector.lastWasAccept { DispatchQueue.main.async { Predictor.shared.keyTyped(code: -1, typed: nil) } }
             Injector.lastWasAccept = false
             return nil
         }
@@ -52,7 +52,7 @@ private func keyTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CG
             let nav: Set<Int64> = [51, 53, 115, 116, 117, 119, 121, 123, 124, 125, 126, 36, 76, 48]
             DispatchQueue.main.async {
                 if nav.contains(code) && code != 51 { Predictor.shared.hide(); return }
-                Predictor.shared.keyTyped(code == 51 ? nil : typed)
+                Predictor.shared.keyTyped(code: code, typed: code == 51 ? nil : typed)
             }
         } else {
             Predictor.shared.hide()

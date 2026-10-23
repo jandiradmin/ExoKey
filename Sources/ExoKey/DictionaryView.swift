@@ -51,6 +51,8 @@ struct DictionaryView: View {
             }
             if ui.kind == .exception { Text(L.t("dict.hintException")).font(.caption).foregroundStyle(.secondary) }
             if ui.kind == .rule { Text(L.t("dict.hintRule")).font(.caption).foregroundStyle(.secondary) }
+            if ui.kind == .phrase { Text(L.t("dict.hintPhrase")).font(.caption).foregroundStyle(.secondary) }
+            if ui.kind == .banned { Text(L.t("dict.hintBanned")).font(.caption).foregroundStyle(.secondary) }
 
             Table(rows, selection: $ui.selection) {
                 TableColumn(L.t("dict.word"), value: \.word)
@@ -78,6 +80,10 @@ struct DictionaryView: View {
                 }
                 if ui.kind == .candidate || ui.kind == .word || ui.kind == .rule {
                     Button(L.t("dict.toException")) { move(to: .exception) }.disabled(ui.selection.isEmpty)
+                }
+                if ui.kind == .phrase {
+                    Button(L.t("dict.toBanned")) { move(to: .banned) }.disabled(ui.selection.isEmpty)
+                    Button(L.t("ai.clear")) { UserStore.shared.clearPersonalization() }
                 }
                 Spacer()
                 Text("\(rows.count)").foregroundStyle(.secondary)
@@ -112,7 +118,7 @@ struct EntryEditor: View {
     var body: some View {
         Form {
             Picker(L.t("dict.kind"), selection: $m.entry.kind) {
-                ForEach([EntryKind.word, .exception, .rule]) { k in Text(L.t("kind." + k.rawValue)).tag(k) }
+                ForEach([EntryKind.word, .exception, .rule, .phrase, .banned]) { k in Text(L.t("kind." + k.rawValue)).tag(k) }
             }
             TextField(L.t("dict.word"), text: $m.entry.word)
             Picker(L.t("dict.lang"), selection: $m.entry.lang) {
@@ -138,7 +144,8 @@ struct EntryEditor: View {
     private func save() {
         let store = UserStore.shared
         var entry = m.entry
-        entry.word = TextNorm.normalize(entry.word.trimmingCharacters(in: .whitespacesAndNewlines), entry.lang)
+        let trimmed = entry.word.trimmingCharacters(in: .whitespacesAndNewlines)
+        entry.word = (entry.kind == .phrase || entry.kind == .banned) ? trimmed.lowercased() : TextNorm.normalize(trimmed, entry.lang)
         guard !entry.word.isEmpty else { return }
         if entry.kind == .rule, entry.targetLang == nil { entry.targetLang = .ru }
         let o = m.original

@@ -45,6 +45,7 @@ final class Engine {
         loadDictionaries()
         layouts.onChange = { [weak self] external in
             guard let self = self else { return }
+            Predictor.shared.hide()
             if external, !self.keys.isEmpty {
                 // user switched layout by hand in the middle of a word — leave it alone
                 self.disabled = true
@@ -72,8 +73,12 @@ final class Engine {
 
     // MARK: - Reset
 
+    private var pendingSentenceEnd = false
+    private func code(_ k: KeyStroke) -> UInt16 { k.code }
+
     func reset() {
         calcBuf = ""
+        sentence = []
         resetWord()
         last = nil
         convertCycle = []
@@ -111,6 +116,24 @@ final class Engine {
             if settings.enabled { undo() }
             return .swallow
         }
+        // Autocomplete keys (TZ §13.3)
+        let pred = Predictor.shared
+        if settings.hkToggleAI.matches(code: code, flags: flags) {
+            settings.aiEnabled.toggle()
+            if settings.aiEnabled { AIModel.shared.start() } else { AIModel.shared.stop(); pred.hide() }
+            Notifier.show(L.t(settings.aiEnabled ? "notif.aiOn" : "notif.aiOff"))
+            return .swallow
+        }
+        if settings.hkUndoInsert.matches(code: code, flags: flags) {
+            pred.undoInsert()
+            reset()
+            return .swallow
+        }
+        if pred.isVisible {
+            if settings.hkAcceptAll.matches(code: code, flags: flags) { pred.accept(all: true); reset(); return .swallow }
+            if settings.hkAcceptWord.matches(code: code, flags: flags) { pred.accept(all: false); reset(); return .swallow }
+            if settings.hkHide.matches(code: code, flags: flags) { pred.dismiss(); return .swallow }
+        }
         if settings.hkConvert.matches(code: code, flags: flags) {
             if settings.enabled, !excludedApp { convert() }
             return .swallow
@@ -119,13 +142,6 @@ final class Engine {
         keyCount += 1
         if keyCount <= 3 || keyCount % 200 == 0 {
             Log.write("key #\(keyCount) enabled=\(settings.enabled) excluded=\(excludedApp) secure=\(IsSecureEventInputEnabled()) layout=\(layouts.currentID) lang=\(layouts.currentLang?.rawValue ?? "nil")")
-        }
-        if Predictor.shared.isVisible, code == 48,
-           flags.intersection([.maskCommand, .maskControl, .maskAlternate]).isEmpty {
-            let shift = flags.contains(.maskShift)
-            Predictor.shared.accept(all: shift != Settings.shared.tabAcceptsAll)
-            reset()
-            return .swallow
         }
         guard settings.enabled, !excludedApp, !IsSecureEventInputEnabled() else { reset(); return .pass }
         if !flags.intersection([.maskCommand, .maskControl, .maskAlternate]).isEmpty { reset(); return .pass }
@@ -232,6 +248,7 @@ final class Engine {
             return .pass
         }
         var result = Result.pass
+        if let ch = cur.char(ks), ".!?\r\n".contains(ch) || code(ks) == 36 { pendingSentenceEnd = true }
         if !disabled, let target = decideFinal() {
             let boundaryChar = cur.char(ks) ?? ""
             apply(to: target, typedSoFarExcludingLast: false, manual: false)
@@ -245,10 +262,40 @@ final class Engine {
             learnUnknown(screen)
         }
         finishWord(endedWithSpace: kind == .space)
+        if pendingSentenceEnd { sentence = []; pendingSentenceEnd = false }
         return result
     }
 
+    // Recent words of the current sentence, for learning frequent phrases (TZ §13.5). Not persisted.
+    private var sentence: [String] = []
+    private var sentenceLang: Lang?
+
+    private func learnPhrase(word: String, lang: Lang, sentenceEnd: Bool) {
+        guard settings.learnPhrases, settings.aiPersonalization else { sentence = []; return }
+        if sentenceLang != lang { sentence = []; sentenceLang = lang }
+        if !word.isEmpty { sentence.append(word) }
+        if sentence.count > 4 { sentence.removeFirst() }
+        for n in [3, 4] where sentence.count >= n {
+            let phrase = sentence.suffix(n).joined(separator: " ")
+            let c = store.bump("p:\(lang.rawValue):\(phrase)")
+            if c == 3, store.find(.phrase, lang, phrase) == nil {
+                store.upsert(UserEntry(word: phrase, lang: lang, kind: .phrase, uses: c, source: .learned))
+            }
+        }
+        if sentenceEnd { sentence = [] }
+    }
+
+    /// The word typed so far is not valid in the current layout and not decided yet — don't suggest.
+    var wordUncertain: Bool {
+        guard !keys.isEmpty, !disabled, let o = screenLang else { return false }
+        let t = core(keys, o)
+        return !t.isEmpty && prefixScore(t, o) == 0
+    }
+
     private func finishWord(endedWithSpace: Bool) {
+        if let lang = screenLang, !disabled || correction != nil {
+            learnPhrase(word: core(keys, lang), lang: lang, sentenceEnd: false)
+        }
         if let lang = screenLang {
             if let c = correction, !c.manual, let fromL = layouts.layouts[c.from] {
                 // correction was not undone — weak positive signal
