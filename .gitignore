@@ -1,0 +1,9 @@
+.build/
+build/
+data/raw/
+.DS_Store
+*.xcodeproj
+.swiftpm/
+data/dict/
+build.log
+data/brew.log

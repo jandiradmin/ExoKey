@@ -1,0 +1,462 @@
+import AppKit
+import Carbon
+
+/// Decides when the current word was typed in the wrong layout and fixes it.
+final class Engine {
+    static let shared = Engine()
+
+    private let layouts = LayoutManager.shared
+    private let store = UserStore.shared
+    private let settings = Settings.shared
+    private(set) var dicts: [Lang: WordDictionary] = [:]
+
+    var excludedApp = false
+    var recordingHotkey = false
+    var onStateChange: (() -> Void)?
+
+    // Tunables
+    private let minAltPrefix = 20        // ppb: alternative prefix must be at least this common
+    private let midRatio = 100           // alternative must beat original prefix by this factor
+    private let finalRatio = 1000        // ...and an existing original word by this factor
+    private let ambiguityRatio = 4       // best vs second-best alternative
+    private let userWordBonus = 1_000_000
+
+    // Current word
+    private var keys: [KeyStroke] = []
+    private var screenLang: Lang?
+    private var disabled = false
+    private var corrections = 0
+    private var visited: Set<Lang> = []
+    private var correction: Correction?
+
+    struct Correction { let from: Lang; let to: Lang; let manual: Bool }
+
+    // Last finished word (only when it ended with a space)
+    private struct Finished { var keys: [KeyStroke]; var lang: Lang; var correction: Correction? }
+    private var last: Finished?
+    private var convertCycle: [Lang] = []
+
+    private var prevWordLang: Lang?
+
+    private init() {
+        loadDictionaries()
+        layouts.onChange = { [weak self] external in
+            guard let self = self else { return }
+            if external, !self.keys.isEmpty {
+                // user switched layout by hand in the middle of a word — leave it alone
+                self.disabled = true
+                self.correction = nil
+            }
+            self.onStateChange?()
+        }
+    }
+
+    func loadDictionaries() {
+        guard let res = Bundle.main.resourceURL else { return }
+        for l in Lang.allCases {
+            let candidates = [res.appendingPathComponent("\(l.rawValue).exd"),
+                              res.appendingPathComponent("dict/\(l.rawValue).exd")]
+            for u in candidates where FileManager.default.fileExists(atPath: u.path) {
+                if let d = WordDictionary(url: u, lang: l) { dicts[l] = d; break }
+            }
+        }
+        NSLog("ExoKey dictionaries: \(dicts.mapValues(\.count))")
+    }
+
+    private var active: [KeyLayout] {
+        Lang.allCases.compactMap { settings.activeLangs.contains($0) ? layouts.layouts[$0] : nil }
+    }
+
+    // MARK: - Reset
+
+    func reset() {
+        resetWord()
+        last = nil
+        convertCycle = []
+    }
+
+    private func resetWord() {
+        keys = []
+        screenLang = nil
+        disabled = false
+        corrections = 0
+        visited = []
+        correction = nil
+    }
+
+    // MARK: - Event entry point
+
+    enum Result { case pass, swallow }
+
+    private static let navKeys: Set<UInt16> = [53, 115, 116, 117, 119, 121, 123, 124, 125, 126, 114, 71]
+    private static let boundaryKeys: Set<UInt16> = [49, 36, 76, 48] // space, return, enter, tab
+
+    func keyDown(_ event: CGEvent) -> Result {
+        let code = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
+        let flags = event.flags
+        if recordingHotkey { return .pass }
+
+        if settings.hkPause.matches(code: code, flags: flags) {
+            settings.enabled.toggle()
+            reset()
+            Notifier.show(L.t(settings.enabled ? "notif.resumed" : "notif.paused"))
+            onStateChange?()
+            return .swallow
+        }
+        if settings.hkUndo.matches(code: code, flags: flags) {
+            if settings.enabled { undo() }
+            return .swallow
+        }
+        if settings.hkConvert.matches(code: code, flags: flags) {
+            if settings.enabled, !excludedApp { convert() }
+            return .swallow
+        }
+
+        guard settings.enabled, !excludedApp, !IsSecureEventInputEnabled() else { reset(); return .pass }
+        if !flags.intersection([.maskCommand, .maskControl, .maskAlternate]).isEmpty { reset(); return .pass }
+        if code == 51 { backspace(); return .pass }
+        if Self.navKeys.contains(code) || code >= 96 && code <= 122 && KeyNames.special[code] != nil {
+            reset(); return .pass
+        }
+        guard let cur = layouts.current, settings.activeLangs.contains(cur.lang) else { reset(); return .pass }
+
+        let ks = KeyStroke(code: code, shift: flags.contains(.maskShift), caps: flags.contains(.maskAlphaShift))
+
+        if Self.boundaryKeys.contains(code) {
+            return boundary(event: event, ks: ks, cur: cur, kind: code == 49 ? .space : .control)
+        }
+
+        if keys.isEmpty { screenLang = cur.lang; visited = [cur.lang] }
+        let screen = screenLang ?? cur.lang
+
+        // Is this key part of a word?
+        if cur.isWordChar(ks) {
+            if keys.isEmpty, !cur.isLetter(ks) { return .pass } // leading hyphen/apostrophe
+            return appendLetter(ks)
+        }
+        let letterElsewhere = active.contains { $0.lang != cur.lang && $0.isLetter(ks) }
+        if letterElsewhere {
+            // punctuation right after a valid word ends it; otherwise it's probably a letter in another layout
+            if !keys.isEmpty, wordScore(core(keys, screen), screen) > 0 {
+                return boundary(event: event, ks: ks, cur: cur, kind: .symbol)
+            }
+            return appendLetter(ks)
+        }
+        // digits and symbols that are letters nowhere
+        if let ch = cur.char(ks), ch.unicodeScalars.allSatisfy({ CharacterSet.decimalDigits.contains($0) }) {
+            // words with digits are never corrected
+            if keys.isEmpty { screenLang = cur.lang }
+            disabled = true
+            keys.append(ks)
+            return .pass
+        }
+        return boundary(event: event, ks: ks, cur: cur, kind: .symbol)
+    }
+
+    private func appendLetter(_ ks: KeyStroke) -> Result {
+        keys.append(ks)
+        convertCycle = []
+        if keys.count > 40 { disabled = true }
+        guard !disabled, corrections < 2, keys.count >= settings.minLetters else { return .pass }
+        if let d = decideMidWord() {
+            apply(to: d, typedSoFarExcludingLast: true, manual: false)
+            return .swallow
+        }
+        return .pass
+    }
+
+    private func backspace() {
+        if keys.isEmpty {
+            last = nil
+        } else {
+            keys.removeLast()
+            if keys.isEmpty { resetWord() }
+        }
+        convertCycle = []
+    }
+
+    // MARK: - Word end
+
+    private enum BoundaryKind { case space, control, symbol }
+
+    private func boundary(event: CGEvent, ks: KeyStroke, cur: KeyLayout, kind: BoundaryKind) -> Result {
+        defer { convertCycle = [] }
+        guard !keys.isEmpty, let screen = screenLang else {
+            resetWord(); last = nil
+            return .pass
+        }
+        var result = Result.pass
+        if !disabled, let target = decideFinal() {
+            let boundaryChar = cur.char(ks) ?? ""
+            apply(to: target, typedSoFarExcludingLast: false, manual: false)
+            switch kind {
+            case .space, .control: Injector.repost(event)
+            case .symbol: Injector.type(boundaryChar)
+            }
+            result = .swallow
+        } else {
+            learnUnknown(screen)
+        }
+        finishWord(endedWithSpace: kind == .space)
+        return result
+    }
+
+    private func finishWord(endedWithSpace: Bool) {
+        if let lang = screenLang {
+            if let c = correction, !c.manual, let fromL = layouts.layouts[c.from] {
+                // correction was not undone — weak positive signal
+                let orig = TextNorm.normalize(fromL.text(keys), c.from)
+                if settings.learning { _ = store.touch(.rule, c.from, orig, uses: 1, targetLang: c.to) }
+            }
+            prevWordLang = lang
+            last = endedWithSpace ? Finished(keys: keys, lang: lang, correction: correction) : nil
+        }
+        resetWord()
+    }
+
+    // MARK: - Decisions
+
+    /// Normalized text of keys in a layout, nil if it contains non-word characters.
+    private func candidate(_ keys: [KeyStroke], _ l: KeyLayout) -> String? {
+        let t = l.text(keys)
+        guard let f = t.first, let e = t.last else { return nil }
+        for c in t where !(TextNorm.isLetter(c, l.lang) || TextNorm.isInner(c, l.lang)) { return nil }
+        if !TextNorm.isLetter(f, l.lang) || !TextNorm.isLetter(e, l.lang) && keys.count > 1 && !TextNorm.isInner(e, l.lang) {
+            return nil
+        }
+        return TextNorm.normalize(t, l.lang)
+    }
+
+    /// Text of keys in a layout, normalized, with non-letter characters trimmed at the edges.
+    private func core(_ keys: [KeyStroke], _ lang: Lang) -> String {
+        guard let l = layouts.layouts[lang] else { return "" }
+        let t = TextNorm.normalize(l.text(keys), lang)
+        let chars = Array(t)
+        var a = 0, b = chars.count
+        while a < b, !TextNorm.isLetter(chars[a], lang) { a += 1 }
+        while b > a, !TextNorm.isLetter(chars[b - 1], lang) { b -= 1 }
+        return String(chars[a..<b])
+    }
+
+    private func prefixScore(_ s: String, _ l: Lang) -> Int {
+        guard !s.isEmpty else { return 0 }
+        return (dicts[l]?.prefixFreq(s) ?? 0) + (store.hasPrefix(s, l) ? userWordBonus : 0)
+    }
+
+    private func wordScore(_ s: String, _ l: Lang) -> Int {
+        guard !s.isEmpty else { return 0 }
+        return (dicts[l]?.freq(s) ?? 0) + (store.isWord(s, l) ? userWordBonus : 0)
+    }
+
+    /// Case pattern we never touch: CamelCase like "iPhone", short all-caps abbreviations.
+    private func untouchableCase(_ keys: [KeyStroke], final: Bool) -> Bool {
+        let ups = keys.map { $0.shift != $0.caps }
+        if ups.dropFirst().contains(true) {
+            if ups.allSatisfy({ $0 }) { return final && keys.count <= 4 }
+            return true
+        }
+        return false
+    }
+
+    private struct Alt { let lang: Lang; let text: String; let score: Int }
+
+    private func alternatives(_ keys: [KeyStroke], excluding o: Lang, score: (String, Lang) -> Int, minScore: Int) -> [Alt] {
+        var out: [Alt] = []
+        for l in active where l.lang != o && !visited.contains(l.lang) {
+            guard let t = candidate(keys, l) else { continue }
+            let s = score(t, l.lang)
+            if s >= minScore { out.append(Alt(lang: l.lang, text: t, score: s)) }
+        }
+        return out.sorted { $0.score > $1.score }
+    }
+
+    /// Picks between alternatives; nil if ambiguous.
+    private func pick(_ alts: [Alt]) -> Lang? {
+        guard let best = alts.first else { return nil }
+        guard alts.count > 1 else { return best.lang }
+        let second = alts[1]
+        if second.text == best.text {
+            // same text in Russian and Ukrainian — choose the layout by context
+            let pair = Set([best.lang, second.lang])
+            if let p = prevWordLang, pair.contains(p) { return p }
+            if let cur = screenLang, pair.contains(cur) { return cur }
+            return best.lang
+        }
+        return best.score >= second.score * ambiguityRatio ? best.lang : nil
+    }
+
+    private func decideMidWord() -> Lang? {
+        guard let o = screenLang, !untouchableCase(keys, final: false) else { return nil }
+        let oText = core(keys, o)
+        guard oText.count >= settings.minLetters, !store.isException(oText, o) else { return nil }
+        let pO = prefixScore(oText, o)
+        let alts = alternatives(keys, excluding: o, score: prefixScore, minScore: minAltPrefix)
+        guard let best = alts.first else { return nil }
+        if pO > 0 && best.score < pO * midRatio { return nil }
+        return pick(alts)
+    }
+
+    private func decideFinal() -> Lang? {
+        guard let o = screenLang, !untouchableCase(keys, final: true) else { return nil }
+        let oText = core(keys, o)
+        guard !oText.isEmpty, !store.isException(oText, o) else { return nil }
+        // explicit user rule
+        if let r = store.find(.rule, o, oText), r.source == .manual, let tl = r.targetLang, !visited.contains(tl) || tl == o {
+            if tl != o { return tl }
+        }
+        let fO = wordScore(oText, o)
+        let pO = prefixScore(oText, o)
+        let minScore = (fO == 0 && pO == 0) ? 1 : 50
+        let alts = alternatives(keys, excluding: o, score: wordScore, minScore: minScore)
+        guard let best = alts.first else { return nil }
+        if fO > 0 && best.score < fO * finalRatio { return nil }
+        if keys.count < settings.minLetters {
+            // short words: only with context and if the original is not a word at all
+            guard fO == 0, pO == 0, best.score >= 1000, let p = prevWordLang, p == best.lang || p.isCyrillic == best.lang.isCyrillic
+            else { return nil }
+        }
+        return pick(alts)
+    }
+
+    // MARK: - Applying
+
+    private func apply(to target: Lang, typedSoFarExcludingLast: Bool, manual: Bool) {
+        guard let from = screenLang, let fromL = layouts.layouts[from], let toL = layouts.layouts[target] else { return }
+        let onScreen = typedSoFarExcludingLast ? Array(keys.dropLast()) : keys
+        let eraseCount = fromL.text(onScreen).count
+        layouts.select(target)
+        Injector.backspaces(eraseCount)
+        Injector.type(toL.text(keys))
+        let originalFrom = correction?.from ?? from
+        correction = Correction(from: originalFrom, to: target, manual: manual)
+        screenLang = target
+        visited.insert(target)
+        corrections += 1
+        onStateChange?()
+    }
+
+    // MARK: - Undo
+
+    func undo() {
+        if !keys.isEmpty, let c = correction, let cur = screenLang,
+           let curL = layouts.layouts[cur], let fromL = layouts.layouts[c.from] {
+            layouts.select(c.from)
+            Injector.backspaces(curL.text(keys).count)
+            Injector.type(fromL.text(keys))
+            screenLang = c.from
+            disabled = true
+            correction = nil
+            recordUndo(c, original: TextNorm.normalize(fromL.text(keys), c.from))
+            return
+        }
+        if keys.isEmpty, let l = last, let c = l.correction,
+           let curL = layouts.layouts[l.lang], let fromL = layouts.layouts[c.from] {
+            layouts.select(c.from)
+            Injector.backspaces(curL.text(l.keys).count + 1)
+            Injector.type(fromL.text(l.keys) + " ")
+            prevWordLang = c.from
+            last = Finished(keys: l.keys, lang: c.from, correction: nil)
+            recordUndo(c, original: TextNorm.normalize(fromL.text(l.keys), c.from))
+            return
+        }
+        Notifier.show(L.t("notif.undoUnavailable"))
+    }
+
+    private func recordUndo(_ c: Correction, original: String) {
+        guard settings.learning, !c.manual, !original.isEmpty else { return }
+        let e = store.touch(.rule, c.from, original, undos: 1, targetLang: c.to)
+        if e.undos >= settings.undosToException {
+            if let r = store.find(.rule, c.from, original) { store.delete(r) }
+            _ = store.touch(.exception, c.from, original)
+            Notifier.show(L.t("notif.exception", original))
+        }
+    }
+
+    // MARK: - Manual conversion
+
+    func convert() {
+        if !keys.isEmpty, let from = screenLang {
+            guard let target = chooseTarget(keys, from: from) else { return }
+            disabled = true
+            visited = []
+            apply(to: target, typedSoFarExcludingLast: false, manual: true)
+            learnManual(keys, from: correction?.from ?? from, to: target)
+            return
+        }
+        if let l = last, let curL = layouts.layouts[l.lang] {
+            guard let target = chooseTarget(l.keys, from: l.lang), let toL = layouts.layouts[target] else { return }
+            layouts.select(target)
+            Injector.backspaces(curL.text(l.keys).count + 1)
+            Injector.type(toL.text(l.keys) + " ")
+            let orig = l.correction?.from ?? l.lang
+            last = Finished(keys: l.keys, lang: target, correction: Correction(from: orig, to: target, manual: true))
+            prevWordLang = target
+            learnManual(l.keys, from: orig, to: target)
+            onStateChange?()
+        }
+    }
+
+    private func chooseTarget(_ keys: [KeyStroke], from: Lang) -> Lang? {
+        let langs = active.map(\.lang)
+        guard langs.count > 1 else { return nil }
+        if convertCycle.isEmpty {
+            let saved = visited
+            visited = []
+            var alts = alternatives(keys, excluding: from, score: wordScore, minScore: 1)
+            if alts.isEmpty { alts = alternatives(keys, excluding: from, score: prefixScore, minScore: 1) }
+            visited = saved
+            var order = alts.map(\.lang)
+            for l in langs where l != from && !order.contains(l) { order.append(l) }
+            order.append(from)
+            convertCycle = order
+        }
+        let t = convertCycle.removeFirst()
+        convertCycle.append(t)
+        return t == from && convertCycle.count > 1 ? convertCycle.first : t
+    }
+
+    private func learnManual(_ keys: [KeyStroke], from: Lang, to: Lang) {
+        guard settings.learning, from != to, let fromL = layouts.layouts[from], let toL = layouts.layouts[to] else { return }
+        let orig = TextNorm.normalize(fromL.text(keys), from)
+        let word = TextNorm.normalize(toL.text(keys), to)
+        if let ex = store.find(.exception, from, orig) { store.delete(ex) }
+        _ = store.touch(.rule, from, orig, uses: 1, target: word, targetLang: to)
+        if wordScore(word, to) == 0, isLearnable(word, to) {
+            _ = store.touch(.word, to, word, uses: 1)
+        }
+    }
+
+    // MARK: - Learning new words
+
+    private func isLearnable(_ w: String, _ l: Lang) -> Bool {
+        guard w.count >= 2, w.count <= 32 else { return false }
+        return w.allSatisfy { TextNorm.isLetter($0, l) || TextNorm.isInner($0, l) }
+    }
+
+    private func learnUnknown(_ lang: Lang) {
+        guard settings.learning, !disabled || correction != nil, let l = layouts.layouts[lang] else { return }
+        guard let w = candidate(keys, l), isLearnable(w, lang), wordScore(w, lang) == 0 else { return }
+        if store.isException(w, lang) { return }
+        switch settings.addMode {
+        case .immediate:
+            _ = store.touch(.word, lang, w, uses: 1)
+        case .confirm:
+            _ = store.touch(.candidate, lang, w, uses: 1)
+        case .repeated:
+            let e = store.touch(.candidate, lang, w, uses: 1)
+            if e.uses >= settings.repeatCount {
+                if let c = store.find(.candidate, lang, w) { store.delete(c) }
+                _ = store.touch(.word, lang, w, uses: e.uses)
+                Notifier.show(L.t("notif.learned", w))
+            }
+        }
+    }
+
+    // MARK: - Status
+
+    var statusLang: Lang? { layouts.currentLang }
+    var sleeping: Bool {
+        guard let l = layouts.currentLang else { return true }
+        return !settings.activeLangs.contains(l)
+    }
+}
