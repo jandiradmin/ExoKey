@@ -9,6 +9,8 @@ final class Predictor {
 
     private var timer: Timer?
     private var generation = 0
+    private var streamTask: Task<Void, Never>?
+    private var consumed = ""          // characters of the current suggestion the user already typed
     private(set) var suggestion = ""
     private var suggestionLang: Lang = .en
     private let panel: NSPanel
@@ -77,6 +79,7 @@ final class Predictor {
         guard available else { hide(); return }
         if isVisible, let t = typed, t.count == 1, suggestion.hasPrefix(t) {
             suggestion.removeFirst()               // user types what we suggested — keep the rest
+            consumed += t
             if suggestion.trimmingCharacters(in: .whitespaces).isEmpty { hide(); schedule(); return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { [weak self] in self?.reposition() }
             return
@@ -86,6 +89,7 @@ final class Predictor {
     }
 
     func schedule() {
+        WindowContext.shared.refresh()
         timer?.invalidate()
         generation += 1
         let delay = Double(max(50, Settings.shared.aiDelay)) / 1000
@@ -94,6 +98,9 @@ final class Predictor {
 
     func hide() {
         timer?.invalidate()
+        streamTask?.cancel()
+        streamTask = nil
+        consumed = ""
         generation += 1
         suggestion = ""
         panel.orderOut(nil)
@@ -292,16 +299,29 @@ final class Predictor {
         if useModel {
             var prompt = text
             while prompt.last == " " { prompt.removeLast() }
+            if s.aiWindowContext, let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
+                let win = WindowContext.shared.text(for: pid)
+                if !win.isEmpty {
+                    // conversation / page above, then what the user is typing
+                    let field = prompt.suffix(1500)
+                    let w = win.replacingOccurrences(of: String(field.prefix(200)), with: "")
+                    prompt = String(w.suffix(2500)) + "\n\n" + field
+                }
+            }
             let afterSpace = lastChar == " "
             let maxWords = s.aiPhrases ? max(1, s.aiMaxWords) : 1
-            AIModel.shared.complete(prompt, maxTokens: min(48, 4 + maxWords * 3)) { [weak self] out, cut in
-                guard let self = self, gen == self.generation, var out = out else { return }
-                out = Self.extract(out, afterSpace: afterSpace, midWord: !partial.isEmpty, maxWords: maxWords, cut: cut)
+            consumed = ""
+            streamTask = AIModel.shared.stream(prompt, maxTokens: min(48, 4 + maxWords * 3)) { [weak self] raw, done, cut in
+                guard let self = self, gen == self.generation else { return }
+                // while streaming the last word may be unfinished
+                var out = Self.extract(raw, afterSpace: afterSpace, midWord: !partial.isEmpty, maxWords: maxWords, cut: !done || cut)
                 out = self.preferUserWord(out, partial: partial, lang: lang)
                 out = self.removeBanned(out, lang: lang)
-                if out.isEmpty, !partial.isEmpty { out = self.dictCompletion(partial, lang) }
-                guard !out.isEmpty else { return }
-                self.present(out, ctx, lang)
+                if done, out.isEmpty, !partial.isEmpty { out = self.dictCompletion(partial, lang) }
+                guard !out.isEmpty, out.hasPrefix(self.consumed) else { return }
+                let rest = String(out.dropFirst(self.consumed.count))
+                guard !rest.isEmpty, rest != self.suggestion else { return }
+                if self.isVisible { self.suggestion = rest; self.layout() } else { self.present(rest, ctx, lang) }
             }
             return
         }

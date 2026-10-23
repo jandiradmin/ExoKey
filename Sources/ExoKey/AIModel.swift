@@ -6,9 +6,21 @@ final class AIModel: NSObject, ObservableObject, URLSessionDownloadDelegate {
 
     // Pinned versions
     static let engineURL = URL(string: "https://github.com/ggml-org/llama.cpp/releases/download/b11840/llama-b11840-bin-macos-arm64.tar.gz")!
-    static let modelURL = URL(string: "https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q8_0.gguf")!
-    static let modelName = "Qwen3-4B-Instruct-2507 (Q8_0)"
-    static let modelBytes: Int64 = 4_280_000_000
+    struct Variant {
+        let file: String, url: URL, name: String, bytes: Int64, sizeText: String
+    }
+    static let variants: [AIVariant: Variant] = [
+        .fast: Variant(file: "model-fast.gguf",
+                       url: URL(string: "https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf")!,
+                       name: "Qwen3-4B-Instruct-2507 (Q4_K_M)", bytes: 2_497_281_120, sizeText: "2,5"),
+        .quality: Variant(file: "model.gguf",
+                          url: URL(string: "https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q8_0.gguf")!,
+                          name: "Qwen3-4B-Instruct-2507 (Q8_0)", bytes: 4_280_405_600, sizeText: "4,3"),
+    ]
+    static var current: Variant { variants[Settings.shared.aiVariant]! }
+    static var modelURL: URL { current.url }
+    static var modelName: String { current.name }
+    static var modelBytes: Int64 { current.bytes }
     static let port = 8737
 
     enum State: Equatable {
@@ -23,7 +35,15 @@ final class AIModel: NSObject, ObservableObject, URLSessionDownloadDelegate {
     @Published private(set) var state: State = .notInstalled
 
     private var dir: URL { UserStore.dir.appendingPathComponent("ai", isDirectory: true) }
-    private var modelFile: URL { dir.appendingPathComponent("model.gguf") }
+    private var modelFile: URL { dir.appendingPathComponent(Self.current.file) }
+
+    /// Called when the user picks another model variant.
+    func variantChanged() {
+        stop()
+        task?.cancel(); task = nil
+        state = isInstalled ? .installed : .notInstalled
+        if Settings.shared.aiEnabled { start() }
+    }
     private var engineDir: URL { dir.appendingPathComponent("engine", isDirectory: true) }
     private var serverBinary: URL? {
         let fm = FileManager.default
@@ -191,6 +211,40 @@ final class AIModel: NSObject, ObservableObject, URLSessionDownloadDelegate {
     }
 
     // MARK: Completion
+
+    /// Streams the completion: `onUpdate(accumulatedText, done, cutByTokenLimit)` on the main queue.
+    @discardableResult
+    func stream(_ prompt: String, maxTokens: Int, onUpdate: @escaping (String, Bool, Bool) -> Void) -> Task<Void, Never>? {
+        guard state == .ready else { return nil }
+        var req = URLRequest(url: URL(string: "http://127.0.0.1:\(Self.port)/completion")!)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 5
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = ["prompt": prompt, "n_predict": maxTokens, "temperature": 0,
+                                   "cache_prompt": true, "stop": ["\n"], "stream": true]
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        return Task {
+            var acc = ""
+            do {
+                let (bytes, _) = try await URLSession.shared.bytes(for: req)
+                for try await line in bytes.lines {
+                    if Task.isCancelled { return }
+                    guard line.hasPrefix("data: "), let d = line.dropFirst(6).data(using: .utf8),
+                          let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { continue }
+                    acc += obj["content"] as? String ?? ""
+                    let done = (obj["stop"] as? Bool) == true
+                    let cut = (obj["stopped_limit"] as? Bool) == true || (obj["stop_type"] as? String) == "limit"
+                    let snapshot = acc
+                    await MainActor.run { onUpdate(snapshot, done, cut) }
+                    if done { return }
+                }
+            } catch {}
+            if !Task.isCancelled {
+                let snapshot = acc
+                await MainActor.run { onUpdate(snapshot, true, false) }
+            }
+        }
+    }
 
     /// Returns (text, cutByTokenLimit).
     func complete(_ prompt: String, maxTokens: Int = 28, completion: @escaping (String?, Bool) -> Void) {

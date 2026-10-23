@@ -31,7 +31,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             Engine.shared.reset()
             let app = n.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
             Predictor.shared.hide()
-            if Settings.shared.aiEnabled { Predictor.shared.enableAccessibility(for: app) }
+            if Settings.shared.aiEnabled {
+                Predictor.shared.enableAccessibility(for: app)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { WindowContext.shared.refresh(maxAge: 0) }
+            }
             if let id = app?.bundleIdentifier, let raw = Settings.shared.appLayouts[id], let l = Lang(rawValue: raw) {
                 LayoutManager.shared.select(l)
                 self?.updateStatus()

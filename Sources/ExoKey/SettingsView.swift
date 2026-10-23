@@ -94,6 +94,13 @@ struct AISection: View {
                 Text(L.t("ai.mode.light")).tag(AIMode.light)
             }
             if s.aiMode == .model {
+                Picker(L.t("ai.variant"), selection: Binding(get: { s.aiVariant }, set: { v in
+                    s.aiVariant = v
+                    AIModel.shared.variantChanged()
+                })) {
+                    Text(L.t("ai.variant.fast")).tag(AIVariant.fast)
+                    Text(L.t("ai.variant.quality")).tag(AIVariant.quality)
+                }
                 HStack {
                     Text(L.t("ai.model", AIModel.modelName)).font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -127,6 +134,7 @@ struct AISection: View {
                         set: { on in if on { s.aiLangs.insert(l) } else { s.aiLangs.remove(l) } }))
                 }
             }
+            Toggle(L.t("ai.windowContext"), isOn: $s.aiWindowContext)
             Toggle(L.t("ai.personal"), isOn: $s.aiPersonalization)
             Toggle(L.t("ai.learnPhrases"), isOn: $s.learnPhrases).disabled(!s.aiPersonalization)
             Button(L.t("ai.clear")) { UserStore.shared.clearPersonalization() }
