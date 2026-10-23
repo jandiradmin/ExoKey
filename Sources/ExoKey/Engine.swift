@@ -406,9 +406,11 @@ final class Engine {
         guard let best = alts.first else { return nil }
         if fO > 0 && best.score < fO * finalRatio { return nil }
         if keys.count < settings.minLetters {
-            // short words: only with context and if the original is not a word at all
-            guard fO == 0, pO == 0, best.score >= 1000, let p = prevWordLang, p == best.lang || p.isCyrillic == best.lang.isCyrillic
-            else { return nil }
+            // short words ("yf" → "на"): the alternative must be a very common word and the original junk,
+            // or the previous word must be in the same script
+            let strong = best.score >= 2000 && best.score >= max(fO, pO / 10) * 1000
+            let ctx = prevWordLang.map { $0 == best.lang || $0.isCyrillic == best.lang.isCyrillic } ?? false
+            guard keys.count >= 2, strong || (ctx && fO == 0 && best.score >= 500) else { return nil }
         }
         return pick(alts)
     }
@@ -471,6 +473,7 @@ final class Engine {
     // MARK: - Manual conversion
 
     func convert() {
+        Log.write("convert: word=\(keys.count) last=\(last?.keys.count ?? -1)")
         if !keys.isEmpty, let from = screenLang {
             guard let target = chooseTarget(keys, from: from) else { return }
             disabled = true
@@ -480,7 +483,9 @@ final class Engine {
             return
         }
         if let l = last, let curL = layouts.layouts[l.lang] {
-            guard let target = chooseTarget(l.keys, from: l.lang), let toL = layouts.layouts[target] else { return }
+            guard let target = chooseTarget(l.keys, from: l.lang), let toL = layouts.layouts[target] else {
+                Log.write("convert: no target"); return
+            }
             layouts.select(target)
             Injector.backspaces(curL.text(l.keys).count + 1)
             Injector.type(toL.text(l.keys) + " ")

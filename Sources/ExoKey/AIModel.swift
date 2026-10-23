@@ -22,6 +22,8 @@ final class AIModel: NSObject, ObservableObject, URLSessionDownloadDelegate {
     static var modelName: String { current.name }
     static var modelBytes: Int64 { current.bytes }
     static let port = 8737
+    static var minTokenProb: Double { [0.10, 0.05, 0.02][Settings.shared.aiConfidence] }
+    static var minTotalProb: Double { [0.03, 0.01, 0.002][Settings.shared.aiConfidence] }
 
     enum State: Equatable {
         case notInstalled
@@ -221,18 +223,35 @@ final class AIModel: NSObject, ObservableObject, URLSessionDownloadDelegate {
         req.timeoutInterval = 5
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body: [String: Any] = ["prompt": prompt, "n_predict": maxTokens, "temperature": 0,
-                                   "cache_prompt": true, "stop": ["\n"], "stream": true]
+                                   "cache_prompt": true, "stop": ["\n"], "stream": true,
+                                   "n_probs": 1, "post_sampling_probs": false]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        // Only the confident part is shown: stop when the model starts guessing.
+        let minToken = Self.minTokenProb, minTotal = Self.minTotalProb
         return Task {
             var acc = ""
+            var total = 1.0
             do {
                 let (bytes, _) = try await URLSession.shared.bytes(for: req)
                 for try await line in bytes.lines {
                     if Task.isCancelled { return }
                     guard line.hasPrefix("data: "), let d = line.dropFirst(6).data(using: .utf8),
                           let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { continue }
-                    acc += obj["content"] as? String ?? ""
+                    let piece = obj["content"] as? String ?? ""
+                    var p = 1.0
+                    if let probs = obj["completion_probabilities"] as? [[String: Any]] {
+                        for t in probs { if let lp = t["logprob"] as? Double { p *= exp(lp) } }
+                    }
                     let done = (obj["stop"] as? Bool) == true
+                    if !piece.isEmpty, p < minToken || total * p < minTotal {
+                        // unsure from here on: finish with what we have
+                        let midWord = !(piece.first?.isWhitespace ?? true) && (acc.last?.isLetter ?? false) && (piece.first?.isLetter ?? false)
+                        let snapshot = acc
+                        await MainActor.run { onUpdate(snapshot, true, midWord) }
+                        return
+                    }
+                    total *= p
+                    acc += piece
                     let cut = (obj["stopped_limit"] as? Bool) == true || (obj["stop_type"] as? String) == "limit"
                     let snapshot = acc
                     await MainActor.run { onUpdate(snapshot, done, cut) }

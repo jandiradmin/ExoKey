@@ -124,6 +124,12 @@ struct AISection: View {
             if s.aiPhrases {
                 Stepper("\(L.t("ai.length")): \(s.aiMaxWords)", value: $s.aiMaxWords, in: 2...15)
             }
+            Picker(L.t("ai.confidence"), selection: $s.aiConfidence) {
+                Text(L.t("ai.confidence.0")).tag(0)
+                Text(L.t("ai.confidence.1")).tag(1)
+                Text(L.t("ai.confidence.2")).tag(2)
+            }
+            .pickerStyle(.segmented)
             Stepper("\(L.t("ai.delay")): \(s.aiDelay)", value: $s.aiDelay, in: 100...1500, step: 50)
             HStack {
                 Text(L.t("ai.langs"))

@@ -76,6 +76,8 @@ final class Settings: ObservableObject {
     @Published var aiEnabled: Bool { didSet { d.set(aiEnabled, forKey: "aiEnabled") } }
     @Published var aiMode: AIMode { didSet { d.set(aiMode.rawValue, forKey: "aiMode") } }
     @Published var aiVariant: AIVariant { didSet { d.set(aiVariant.rawValue, forKey: "aiVariant") } }
+    /// 0 = careful (short, sure), 1 = normal, 2 = bold (longer, more guesses)
+    @Published var aiConfidence: Int { didSet { d.set(aiConfidence, forKey: "aiConfidence") } }
     @Published var aiWindowContext: Bool { didSet { d.set(aiWindowContext, forKey: "aiWindowContext") } }
     @Published var aiPhrases: Bool { didSet { d.set(aiPhrases, forKey: "aiPhrases") } }
     @Published var aiMaxWords: Int { didSet { d.set(aiMaxWords, forKey: "aiMaxWords") } }
@@ -109,7 +111,7 @@ final class Settings: ObservableObject {
             "repeatCount": 3, "undosToException": 2, "notifications": true, "uiLang": UILang.system.rawValue,
             "excludedApps": ["com.apple.Terminal", "com.googlecode.iterm2", "com.apple.keychainaccess"],
             "activeLangs": ["en", "ru", "uk"],
-            "aiEnabled": false, "aiMode": AIMode.model.rawValue, "aiPhrases": true, "aiVariant": AIVariant.fast.rawValue, "aiWindowContext": true, "aiMaxWords": 8, "aiDelay": 120,
+            "aiEnabled": false, "aiMode": AIMode.model.rawValue, "aiPhrases": true, "aiVariant": AIVariant.fast.rawValue, "aiWindowContext": true, "aiMaxWords": 6, "aiDelay": 120, "aiConfidence": 1,
             "aiLangs": ["en", "ru", "uk"], "aiPersonalization": true, "learnPhrases": false,
             "aiExcludedApps": ["com.apple.Terminal", "com.googlecode.iterm2", "com.microsoft.VSCode",
                                "com.todesktop.230313mzl4w4u92", "com.apple.dt.Xcode", "dev.zed.Zed", "dev.warp.Warp-Stable",
@@ -132,6 +134,7 @@ final class Settings: ObservableObject {
         aiMode = AIMode(rawValue: d.string(forKey: "aiMode") ?? "") ?? .model
         aiPhrases = d.bool(forKey: "aiPhrases")
         aiWindowContext = d.bool(forKey: "aiWindowContext")
+        aiConfidence = d.integer(forKey: "aiConfidence")
         aiVariant = AIVariant(rawValue: d.string(forKey: "aiVariant") ?? "") ?? .fast
         aiMaxWords = d.integer(forKey: "aiMaxWords")
         aiDelay = d.integer(forKey: "aiDelay")
