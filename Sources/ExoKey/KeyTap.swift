@@ -38,9 +38,14 @@ private func keyTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CG
         return Unmanaged.passUnretained(event)
     case .keyDown:
         if Injector.isOwn(event) { return Unmanaged.passUnretained(event) }
-        return Engine.shared.keyDown(event) == .swallow ? nil : Unmanaged.passUnretained(event)
+        if Engine.shared.keyDown(event) == .swallow { return nil }
+        if event.flags.intersection([.maskCommand, .maskControl]).isEmpty {
+            DispatchQueue.main.async { Predictor.shared.keyTyped() }
+        }
+        return Unmanaged.passUnretained(event)
     case .leftMouseDown, .rightMouseDown, .otherMouseDown:
         Engine.shared.reset()
+        Predictor.shared.hide()
         return Unmanaged.passUnretained(event)
     default:
         return Unmanaged.passUnretained(event)

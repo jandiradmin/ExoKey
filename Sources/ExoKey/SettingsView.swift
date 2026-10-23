@@ -54,12 +54,56 @@ final class SettingsUIState: ObservableObject {
     let recPause = HotkeyRecorder()
 }
 
+struct AISection: View {
+    @ObservedObject private var s = Settings.shared
+    @ObservedObject private var ai = AIModel.shared
+
+    private var stateText: String {
+        switch ai.state {
+        case .notInstalled: return L.t("ai.state.notInstalled")
+        case .downloading(let p): return "\(L.t("ai.state.downloading")) \(Int(p * 100))%"
+        case .installed: return L.t("ai.state.installed")
+        case .starting: return L.t("ai.state.starting")
+        case .ready: return L.t("ai.state.ready")
+        case .failed(let e): return L.t("ai.state.failed", e)
+        }
+    }
+
+    var body: some View {
+        Section(L.t("ai.title")) {
+            Text(L.t("ai.explain")).font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Toggle(L.t("ai.enable"), isOn: Binding(
+                    get: { s.aiEnabled },
+                    set: { on in
+                        s.aiEnabled = on
+                        if on { AIModel.shared.start() } else { AIModel.shared.stop(); Predictor.shared.hide() }
+                    }))
+                    .disabled(!ai.isInstalled)
+                Spacer()
+                switch ai.state {
+                case .notInstalled, .failed:
+                    Button(L.t("ai.download")) { ai.download() }
+                case .downloading:
+                    Button(L.t("ai.cancel")) { ai.cancel() }
+                default:
+                    Button(L.t("ai.remove"), role: .destructive) { ai.remove() }
+                }
+            }
+            if case .downloading(let p) = ai.state { ProgressView(value: p) }
+            Text(stateText).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+}
+
 struct SettingsView: View {
     @ObservedObject private var s = Settings.shared
     @ObservedObject private var ui = SettingsUIState()
 
     var body: some View {
         Form {
+            AISection()
             Section(L.t("set.general")) {
                 Toggle(L.t("menu.enabled"), isOn: $s.enabled)
                 Toggle(L.t("set.autostart"), isOn: $ui.autostart)
@@ -101,6 +145,7 @@ struct SettingsView: View {
                 LabeledContent(L.t("hk.pause")) { HotkeyField(hotkey: $s.hkPause, rec: ui.recPause) }
             }
             Section(L.t("set.extras")) {
+                Toggle(L.t("set.skipAllCaps"), isOn: $s.skipAllCaps)
                 Toggle(L.t("set.calculator"), isOn: $s.calculator)
                 Toggle(L.t("set.learnNames"), isOn: $s.learnNames)
                 Toggle(L.t("set.implicitUndo"), isOn: $s.implicitUndo)
@@ -113,7 +158,7 @@ struct SettingsView: View {
                         Picker("", selection: Binding(
                             get: { s.appLayouts[id] ?? "en" },
                             set: { s.appLayouts[id] = $0 })) {
-                            ForEach(Lang.allCases) { l in Text(L.langName(l)).tag(l.rawValue) }
+                            ForEach(installedLangs) { l in Text(L.langName(l)).tag(l.rawValue) }
                         }
                         .labelsHidden()
                         .frame(width: 140)
@@ -157,6 +202,8 @@ struct SettingsView: View {
             Button(L.t("dict.delete"), role: .destructive) { UserStore.shared.deleteAll(); ui.message = "✓" }
         }
     }
+
+    private var installedLangs: [Lang] { Lang.allCases.filter { LayoutManager.shared.layouts[$0] != nil } }
 
     private func appName(_ id: String) -> String {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else { return id }

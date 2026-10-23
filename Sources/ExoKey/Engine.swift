@@ -120,6 +120,14 @@ final class Engine {
         if keyCount <= 3 || keyCount % 200 == 0 {
             Log.write("key #\(keyCount) enabled=\(settings.enabled) excluded=\(excludedApp) secure=\(IsSecureEventInputEnabled()) layout=\(layouts.currentID) lang=\(layouts.currentLang?.rawValue ?? "nil")")
         }
+        if Predictor.shared.isVisible {
+            if code == 48, flags.intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift]).isEmpty {
+                Predictor.shared.accept()
+                reset()
+                return .swallow
+            }
+            Predictor.shared.hide()
+        }
         guard settings.enabled, !excludedApp, !IsSecureEventInputEnabled() else { reset(); return .pass }
         if !flags.intersection([.maskCommand, .maskControl, .maskAlternate]).isEmpty { reset(); return .pass }
         if code == 51 { backspace(); return .pass }
@@ -158,7 +166,11 @@ final class Engine {
 
         // Is this key part of a word?
         if cur.isWordChar(ks) {
-            if keys.isEmpty, !cur.isLetter(ks) { return .pass } // leading hyphen/apostrophe
+            if keys.isEmpty, !cur.isLetter(ks) {
+                // leading ' in English is "э"/"є" in Cyrillic layouts — keep it as a possible letter
+                if active.contains(where: { $0.lang != cur.lang && $0.isLetter(ks) }) { return appendLetter(ks) }
+                return .pass
+            }
             return appendLetter(ks)
         }
         let letterElsewhere = active.contains { $0.lang != cur.lang && $0.isLetter(ks) }
@@ -287,6 +299,7 @@ final class Engine {
     /// Case pattern we never touch: CamelCase like "iPhone", short all-caps abbreviations.
     private func untouchableCase(_ keys: [KeyStroke], final: Bool) -> Bool {
         let ups = keys.map { $0.shift != $0.caps }
+        if settings.skipAllCaps, keys.count >= 2, ups.allSatisfy({ $0 }) { return true }
         if ups.dropFirst().contains(true) {
             if ups.allSatisfy({ $0 }) { return final && keys.count <= 4 }
             return true
@@ -324,7 +337,7 @@ final class Engine {
     private func decideMidWord() -> Lang? {
         guard let o = screenLang, !untouchableCase(keys, final: false) else { return nil }
         let oText = core(keys, o)
-        guard oText.count >= settings.minLetters, !store.isException(oText, o) else { return nil }
+        guard keys.count >= settings.minLetters, !store.isException(oText, o) else { return nil }
         let pO = prefixScore(oText, o)
         let alts = alternatives(keys, excluding: o, score: prefixScore, minScore: minAltPrefix)
         guard let best = alts.first else { return nil }

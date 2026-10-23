@@ -40,8 +40,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         updateExcluded()
 
         if settings.notifications { Notifier.requestAuthorization() }
+        if settings.aiEnabled { AIModel.shared.start() }
         startTapOrAskPermission()
+        if !settings.firstRunDone {
+            settings.firstRunDone = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.openSettings() }
+        }
     }
+
+    func applicationWillTerminate(_ n: Notification) { AIModel.shared.stop() }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         openSettings()
@@ -126,6 +133,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(item(L.t("menu.undo"), #selector(undo), key: settings.hkUndo))
         menu.addItem(item(L.t("menu.convert"), #selector(convert), key: settings.hkConvert))
         menu.addItem(.separator())
+        if let app = NSWorkspace.shared.frontmostApplication, let id = app.bundleIdentifier,
+           id != Bundle.main.bundleIdentifier {
+            let name = app.localizedName ?? id
+            let sub = NSMenu()
+            let current = settings.appLayouts[id]
+            let none = NSMenuItem(title: L.t("menu.appLayout.none"), action: #selector(setAppLayout(_:)), keyEquivalent: "")
+            none.target = self
+            none.representedObject = [id, ""]
+            none.state = current == nil ? .on : .off
+            sub.addItem(none)
+            for l in Lang.allCases where LayoutManager.shared.layouts[l] != nil {
+                let it = NSMenuItem(title: L.langName(l), action: #selector(setAppLayout(_:)), keyEquivalent: "")
+                it.target = self
+                it.representedObject = [id, l.rawValue]
+                it.state = current == l.rawValue ? .on : .off
+                sub.addItem(it)
+            }
+            let parent = NSMenuItem(title: L.t("menu.appLayout", name), action: nil, keyEquivalent: "")
+            parent.submenu = sub
+            menu.addItem(parent)
+        }
         menu.addItem(item(L.t("menu.dictionary"), #selector(openDictionary)))
         menu.addItem(item(L.t("menu.settings"), #selector(openSettings)))
         let au = item(L.t("menu.autostart"), #selector(toggleAutostart))
@@ -141,6 +169,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let i = NSMenuItem(title: t, action: sel, keyEquivalent: "")
         i.target = self
         return i
+    }
+
+    @objc private func setAppLayout(_ sender: NSMenuItem) {
+        guard let v = sender.representedObject as? [String], v.count == 2 else { return }
+        if v[1].isEmpty {
+            settings.appLayouts[v[0]] = nil
+        } else {
+            settings.appLayouts[v[0]] = v[1]
+            if let l = Lang(rawValue: v[1]) { LayoutManager.shared.select(l); updateStatus() }
+        }
     }
 
     @objc private func askPermissions() { startTapOrAskPermission() }
