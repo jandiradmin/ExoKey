@@ -72,6 +72,8 @@ final class Predictor {
 
     /// Called after a key event was delivered to the app. `typed` — produced character (nil for non-text).
     func keyTyped(code: Int64, typed: String?) {
+        if code < 0 && suppressed { return }      // our own swallowed key (e.g. Esc) — stay hidden
+        suppressed = false
         keysSinceInsert += 1
         if keysSinceInsert == 1, code == 51, !lastInsert.isEmpty {
             recordRejection()                      // erased right after accepting
@@ -106,8 +108,9 @@ final class Predictor {
         panel.orderOut(nil)
     }
 
-    /// Esc: hide without treating it as an error (ignoring is not a negative signal).
-    func dismiss() { hide() }
+    /// Esc: hide and don't suggest again until the user types something.
+    private var suppressed = false
+    func dismiss() { hide(); suppressed = true }
 
     func accept(all: Bool) {
         guard !suggestion.isEmpty else { return }
@@ -423,6 +426,8 @@ final class Predictor {
             s.removeFirst()
         }
         if let nl = s.firstIndex(where: \.isNewline) { s = String(s[..<nl]) }
+        // escaped junk like "\n\n\n", markup, code
+        if let bad = s.firstIndex(where: { "\\{}<>[]|`#*_=~^".contains($0) }) { s = String(s[..<bad]) }
         var out = ""
         var words = 0
         var inWord = midWord && (s.first?.isLetter ?? false)
@@ -445,8 +450,12 @@ final class Predictor {
         if !ended, !stoppedEarly, cut, inWord, let sp = out.lastIndex(of: " "), sp != out.startIndex {
             out = String(out[..<sp])
         }
-        while let l = out.last, l == " " || l == "," || l == ";" || l == ":" || l == "—" { out.removeLast() }
-        guard out.contains(where: { $0.isLetter || $0.isNumber }) else { return "" }
+        while let l = out.last, l == " " || l == "," || l == ";" || l == ":" || l == "—" || l == "(" || l == "\"" { out.removeLast() }
+        // must be mostly letters, and no long runs of the same character
+        let letters = out.filter { $0.isLetter }.count
+        guard letters >= 1, Double(letters) / Double(max(1, out.filter { $0 != " " }.count)) > 0.6 else { return "" }
+        var run = 1, prev: Character? = nil
+        for ch in out { run = ch == prev ? run + 1 : 1; prev = ch; if run >= 4 { return "" } }
         return out
     }
 
