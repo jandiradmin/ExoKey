@@ -120,13 +120,12 @@ final class Engine {
         if keyCount <= 3 || keyCount % 200 == 0 {
             Log.write("key #\(keyCount) enabled=\(settings.enabled) excluded=\(excludedApp) secure=\(IsSecureEventInputEnabled()) layout=\(layouts.currentID) lang=\(layouts.currentLang?.rawValue ?? "nil")")
         }
-        if Predictor.shared.isVisible {
-            if code == 48, flags.intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift]).isEmpty {
-                Predictor.shared.accept()
-                reset()
-                return .swallow
-            }
-            Predictor.shared.hide()
+        if Predictor.shared.isVisible, code == 48,
+           flags.intersection([.maskCommand, .maskControl, .maskAlternate]).isEmpty {
+            let shift = flags.contains(.maskShift)
+            Predictor.shared.accept(all: shift != Settings.shared.tabAcceptsAll)
+            reset()
+            return .swallow
         }
         guard settings.enabled, !excludedApp, !IsSecureEventInputEnabled() else { reset(); return .pass }
         if !flags.intersection([.maskCommand, .maskControl, .maskAlternate]).isEmpty { reset(); return .pass }

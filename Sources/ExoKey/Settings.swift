@@ -64,6 +64,7 @@ final class Settings: ObservableObject {
     @Published var uiLang: UILang { didSet { d.set(uiLang.rawValue, forKey: "uiLang") } }
     @Published var excludedApps: [String] { didSet { d.set(excludedApps, forKey: "excludedApps") } }
     @Published var aiEnabled: Bool { didSet { d.set(aiEnabled, forKey: "aiEnabled") } }
+    @Published var tabAcceptsAll: Bool { didSet { d.set(tabAcceptsAll, forKey: "tabAcceptsAll") } }
     @Published var skipAllCaps: Bool { didSet { d.set(skipAllCaps, forKey: "skipAllCaps") } }
     var firstRunDone: Bool {
         get { d.bool(forKey: "firstRunDone") }
@@ -84,7 +85,7 @@ final class Settings: ObservableObject {
             "repeatCount": 3, "undosToException": 2, "notifications": true, "uiLang": UILang.system.rawValue,
             "excludedApps": ["com.apple.Terminal", "com.googlecode.iterm2", "com.apple.keychainaccess"],
             "activeLangs": ["en", "ru", "uk"],
-            "aiEnabled": false, "skipAllCaps": true,
+            "aiEnabled": false, "tabAcceptsAll": true, "skipAllCaps": true,
             "calculator": true, "learnNames": true, "implicitUndo": true,
         ])
         enabled = d.bool(forKey: "enabled")
@@ -99,6 +100,7 @@ final class Settings: ObservableObject {
         excludedApps = d.stringArray(forKey: "excludedApps") ?? []
         aiEnabled = d.bool(forKey: "aiEnabled")
         skipAllCaps = d.bool(forKey: "skipAllCaps")
+        tabAcceptsAll = d.bool(forKey: "tabAcceptsAll")
         calculator = d.bool(forKey: "calculator")
         learnNames = d.bool(forKey: "learnNames")
         implicitUndo = d.bool(forKey: "implicitUndo")

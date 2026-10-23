@@ -3,6 +3,7 @@ import CoreGraphics
 /// Posts synthetic keyboard events. All of them carry a tag so our own tap ignores them.
 enum Injector {
     static let tag: Int64 = 0x4558_4F4B // "EXOK"
+    static var lastWasAccept = false
     private static let source = CGEventSource(stateID: .privateState)
 
     static func isOwn(_ e: CGEvent) -> Bool { e.getIntegerValueField(.eventSourceUserData) == tag }

@@ -38,9 +38,24 @@ private func keyTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CG
         return Unmanaged.passUnretained(event)
     case .keyDown:
         if Injector.isOwn(event) { return Unmanaged.passUnretained(event) }
-        if Engine.shared.keyDown(event) == .swallow { return nil }
+        if Engine.shared.keyDown(event) == .swallow {
+            if !Injector.lastWasAccept { DispatchQueue.main.async { Predictor.shared.keyTyped(nil) } }
+            Injector.lastWasAccept = false
+            return nil
+        }
         if event.flags.intersection([.maskCommand, .maskControl]).isEmpty {
-            DispatchQueue.main.async { Predictor.shared.keyTyped() }
+            var len = 0
+            var chars = [UniChar](repeating: 0, count: 4)
+            event.keyboardGetUnicodeString(maxStringLength: 4, actualStringLength: &len, unicodeString: &chars)
+            let typed = len > 0 ? String(utf16CodeUnits: chars, count: len) : nil
+            let code = event.getIntegerValueField(.keyboardEventKeycode)
+            let nav: Set<Int64> = [51, 53, 115, 116, 117, 119, 121, 123, 124, 125, 126, 36, 76, 48]
+            DispatchQueue.main.async {
+                if nav.contains(code) && code != 51 { Predictor.shared.hide(); return }
+                Predictor.shared.keyTyped(code == 51 ? nil : typed)
+            }
+        } else {
+            Predictor.shared.hide()
         }
         return Unmanaged.passUnretained(event)
     case .leftMouseDown, .rightMouseDown, .otherMouseDown:

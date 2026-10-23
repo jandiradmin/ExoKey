@@ -135,6 +135,12 @@ final class AIModel: NSObject, ObservableObject, URLSessionDownloadDelegate {
     func start() {
         guard isInstalled, process == nil, let bin = serverBinary else { return }
         state = .starting
+        // kill a server left over from a previous ExoKey run
+        let k = Process()
+        k.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+        k.arguments = ["-f", "ExoKey/ai/engine/"]
+        try? k.run(); k.waitUntilExit()
+        Thread.sleep(forTimeInterval: 0.3)
         let p = Process()
         p.executableURL = bin
         p.currentDirectoryURL = bin.deletingLastPathComponent()
@@ -192,7 +198,7 @@ final class AIModel: NSObject, ObservableObject, URLSessionDownloadDelegate {
         req.httpMethod = "POST"
         req.timeoutInterval = 3
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let body: [String: Any] = ["prompt": prompt, "n_predict": 8, "temperature": 0,
+        let body: [String: Any] = ["prompt": prompt, "n_predict": 28, "temperature": 0,
                                    "cache_prompt": true, "stop": ["\n"]]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
         URLSession.shared.dataTask(with: req) { data, _, _ in

@@ -91,6 +91,10 @@ struct AISection: View {
                     Button(L.t("ai.remove"), role: .destructive) { ai.remove() }
                 }
             }
+            Picker(L.t("ai.tab"), selection: $s.tabAcceptsAll) {
+                Text(L.t("ai.tab.all")).tag(true)
+                Text(L.t("ai.tab.word")).tag(false)
+            }
             if case .downloading(let p) = ai.state { ProgressView(value: p) }
             Text(stateText).font(.caption).foregroundStyle(.secondary)
         }
