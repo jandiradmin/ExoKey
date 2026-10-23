@@ -232,7 +232,9 @@ final class Predictor {
             AXValueGetValue(rv as! AXValue, .cfRange, &range)
         }
         guard range.length == 0 else { return fail("selection") }
-        let loc = min(max(0, range.location), ns.length)
+        var loc = min(max(0, range.location), ns.length)
+        // some Electron editors report the caret at 0 — assume typing at the end
+        if loc == 0, ns.length > 0 { loc = ns.length }
         let after = ns.substring(from: loc)
         let restOfLine = after.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? ""
         if !restOfLine.unicodeScalars.allSatisfy({ Self.invisible.contains($0) }) { return fail("text-after-caret") }
