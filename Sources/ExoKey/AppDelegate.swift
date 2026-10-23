@@ -26,9 +26,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
-        ) { [weak self] _ in
+        ) { [weak self] n in
             self?.updateExcluded()
             Engine.shared.reset()
+            let app = n.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            if let id = app?.bundleIdentifier, let raw = Settings.shared.appLayouts[id], let l = Lang(rawValue: raw) {
+                LayoutManager.shared.select(l)
+                self?.updateStatus()
+            }
         }
         settings.$excludedApps.sink { [weak self] _ in DispatchQueue.main.async { self?.updateExcluded() } }.store(in: &bag)
         settings.$enabled.sink { [weak self] _ in DispatchQueue.main.async { self?.updateStatus() } }.store(in: &bag)
@@ -38,15 +43,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         startTapOrAskPermission()
     }
 
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        openSettings()
+        return false
+    }
+
     // MARK: Permissions
 
     private var hasPermissions: Bool { AXIsProcessTrusted() }
 
     private func startTapOrAskPermission() {
+        Log.write("launch: AX=\(AXIsProcessTrusted()) listen=\(CGPreflightListenEventAccess()) post=\(CGPreflightPostEventAccess())")
         if hasPermissions, KeyTap.shared.start() {
+            Log.write("tap started")
             updateStatus()
             return
         }
+        Log.write("tap not started, asking permissions")
         let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(opts)
         if !CGPreflightListenEventAccess() { _ = CGRequestListenEventAccess() }
@@ -55,6 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         permTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] t in
             guard let self = self else { return }
             if self.hasPermissions, KeyTap.shared.start() {
+                Log.write("tap started after permission")
                 t.invalidate()
                 self.updateStatus()
             }

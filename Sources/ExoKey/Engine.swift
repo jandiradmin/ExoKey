@@ -37,6 +37,9 @@ final class Engine {
     private var convertCycle: [Lang] = []
 
     private var prevWordLang: Lang?
+    private var keyCount = 0
+    private var calcBuf = ""
+    private var correctionKeys: [KeyStroke] = []
 
     private init() {
         loadDictionaries()
@@ -60,7 +63,7 @@ final class Engine {
                 if let d = WordDictionary(url: u, lang: l) { dicts[l] = d; break }
             }
         }
-        NSLog("ExoKey dictionaries: \(dicts.mapValues(\.count))")
+        Log.write("dictionaries: \(dicts.mapValues(\.count)) layouts: \(LayoutManager.shared.all.map { "\($0.lang.rawValue)=\($0.id)" }) current=\(LayoutManager.shared.currentID)")
     }
 
     private var active: [KeyLayout] {
@@ -70,6 +73,7 @@ final class Engine {
     // MARK: - Reset
 
     func reset() {
+        calcBuf = ""
         resetWord()
         last = nil
         convertCycle = []
@@ -112,6 +116,10 @@ final class Engine {
             return .swallow
         }
 
+        keyCount += 1
+        if keyCount <= 3 || keyCount % 200 == 0 {
+            Log.write("key #\(keyCount) enabled=\(settings.enabled) excluded=\(excludedApp) secure=\(IsSecureEventInputEnabled()) layout=\(layouts.currentID) lang=\(layouts.currentLang?.rawValue ?? "nil")")
+        }
         guard settings.enabled, !excludedApp, !IsSecureEventInputEnabled() else { reset(); return .pass }
         if !flags.intersection([.maskCommand, .maskControl, .maskAlternate]).isEmpty { reset(); return .pass }
         if code == 51 { backspace(); return .pass }
@@ -121,6 +129,25 @@ final class Engine {
         guard let cur = layouts.current, settings.activeLangs.contains(cur.lang) else { reset(); return .pass }
 
         let ks = KeyStroke(code: code, shift: flags.contains(.maskShift), caps: flags.contains(.maskAlphaShift))
+
+        // Inline calculator
+        if settings.calculator, let ch = cur.char(ks), ch.count == 1, let c = ch.first {
+            if c == "=" {
+                if let r = Calculator.evaluate(calcBuf) {
+                    calcBuf = ""
+                    resetWord(); last = nil
+                    Injector.type("=" + r)
+                    Log.write("calc")
+                    return .swallow
+                }
+                calcBuf = ""
+            } else if Calculator.allowed.contains(c) {
+                calcBuf.append(c)
+                if calcBuf.count > 80 { calcBuf.removeFirst(calcBuf.count - 80) }
+            } else {
+                calcBuf = ""
+            }
+        }
 
         if Self.boundaryKeys.contains(code) {
             return boundary(event: event, ks: ks, cur: cur, kind: code == 49 ? .space : .control)
@@ -160,15 +187,23 @@ final class Engine {
         guard !disabled, corrections < 2, keys.count >= settings.minLetters else { return .pass }
         if let d = decideMidWord() {
             apply(to: d, typedSoFarExcludingLast: true, manual: false)
+            Log.write("mid fix len=\(keys.count) -> \(d.rawValue)")
             return .swallow
         }
         return .pass
     }
 
     private func backspace() {
+        if !calcBuf.isEmpty { calcBuf.removeLast() }
         if keys.isEmpty {
             last = nil
         } else {
+            if keys.count == 1, settings.implicitUndo, let c = correction, !c.manual,
+               let fromL = layouts.layouts[c.from], !correctionKeys.isEmpty {
+                // user erased the word we corrected — treat as undo
+                recordUndo(c, original: TextNorm.normalize(fromL.text(correctionKeys), c.from))
+                Log.write("implicit undo")
+            }
             keys.removeLast()
             if keys.isEmpty { resetWord() }
         }
@@ -189,6 +224,7 @@ final class Engine {
         if !disabled, let target = decideFinal() {
             let boundaryChar = cur.char(ks) ?? ""
             apply(to: target, typedSoFarExcludingLast: false, manual: false)
+            Log.write("final fix len=\(keys.count) -> \(target.rawValue)")
             switch kind {
             case .space, .control: Injector.repost(event)
             case .symbol: Injector.type(boundaryChar)
@@ -327,6 +363,7 @@ final class Engine {
         layouts.select(target)
         Injector.backspaces(eraseCount)
         Injector.type(toL.text(keys))
+        correctionKeys = keys
         let originalFrom = correction?.from ?? from
         correction = Correction(from: originalFrom, to: target, manual: manual)
         screenLang = target
@@ -437,6 +474,11 @@ final class Engine {
         guard settings.learning, !disabled || correction != nil, let l = layouts.layouts[lang] else { return }
         guard let w = candidate(keys, l), isLearnable(w, lang), wordScore(w, lang) == 0 else { return }
         if store.isException(w, lang) { return }
+        // Names, places (Capitalized) and abbreviations (ALL CAPS) are learned faster
+        let ups = keys.map { $0.shift != $0.caps }
+        let isName = ups.first == true && !ups.dropFirst().contains(true)
+        let isAbbr = ups.count >= 2 && ups.count <= 6 && ups.allSatisfy { $0 }
+        let threshold = settings.learnNames && (isName || isAbbr) ? min(2, settings.repeatCount) : settings.repeatCount
         switch settings.addMode {
         case .immediate:
             _ = store.touch(.word, lang, w, uses: 1)
@@ -444,7 +486,7 @@ final class Engine {
             _ = store.touch(.candidate, lang, w, uses: 1)
         case .repeated:
             let e = store.touch(.candidate, lang, w, uses: 1)
-            if e.uses >= settings.repeatCount {
+            if e.uses >= threshold {
                 if let c = store.find(.candidate, lang, w) { store.delete(c) }
                 _ = store.touch(.word, lang, w, uses: e.uses)
                 Notifier.show(L.t("notif.learned", w))

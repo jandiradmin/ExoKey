@@ -63,6 +63,11 @@ final class Settings: ObservableObject {
     @Published var notifications: Bool { didSet { d.set(notifications, forKey: "notifications") } }
     @Published var uiLang: UILang { didSet { d.set(uiLang.rawValue, forKey: "uiLang") } }
     @Published var excludedApps: [String] { didSet { d.set(excludedApps, forKey: "excludedApps") } }
+    @Published var calculator: Bool { didSet { d.set(calculator, forKey: "calculator") } }
+    @Published var learnNames: Bool { didSet { d.set(learnNames, forKey: "learnNames") } }
+    @Published var implicitUndo: Bool { didSet { d.set(implicitUndo, forKey: "implicitUndo") } }
+    /// bundle id -> layout language to switch to when the app becomes active
+    @Published var appLayouts: [String: String] { didSet { d.set(appLayouts, forKey: "appLayouts") } }
     @Published var hkUndo: Hotkey { didSet { save(hkUndo, "hkUndo") } }
     @Published var hkConvert: Hotkey { didSet { save(hkConvert, "hkConvert") } }
     @Published var hkPause: Hotkey { didSet { save(hkPause, "hkPause") } }
@@ -73,6 +78,7 @@ final class Settings: ObservableObject {
             "repeatCount": 3, "undosToException": 2, "notifications": true, "uiLang": UILang.system.rawValue,
             "excludedApps": ["com.apple.Terminal", "com.googlecode.iterm2", "com.apple.keychainaccess"],
             "activeLangs": ["en", "ru", "uk"],
+            "calculator": true, "learnNames": true, "implicitUndo": true,
         ])
         enabled = d.bool(forKey: "enabled")
         activeLangs = Set((d.stringArray(forKey: "activeLangs") ?? []).compactMap(Lang.init(rawValue:)))
@@ -84,6 +90,10 @@ final class Settings: ObservableObject {
         notifications = d.bool(forKey: "notifications")
         uiLang = UILang(rawValue: d.string(forKey: "uiLang") ?? "") ?? .system
         excludedApps = d.stringArray(forKey: "excludedApps") ?? []
+        calculator = d.bool(forKey: "calculator")
+        learnNames = d.bool(forKey: "learnNames")
+        implicitUndo = d.bool(forKey: "implicitUndo")
+        appLayouts = d.dictionary(forKey: "appLayouts") as? [String: String] ?? [:]
         let ctrlOpt = CGEventFlags([.maskControl, .maskAlternate]).rawValue
         hkUndo = Self.load(d, "hkUndo") ?? Hotkey(keyCode: 6, mods: ctrlOpt)      // ⌃⌥Z
         hkConvert = Self.load(d, "hkConvert") ?? Hotkey(keyCode: 7, mods: ctrlOpt) // ⌃⌥X

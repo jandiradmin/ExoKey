@@ -100,6 +100,32 @@ struct SettingsView: View {
                 LabeledContent(L.t("hk.convert")) { HotkeyField(hotkey: $s.hkConvert, rec: ui.recConvert) }
                 LabeledContent(L.t("hk.pause")) { HotkeyField(hotkey: $s.hkPause, rec: ui.recPause) }
             }
+            Section(L.t("set.extras")) {
+                Toggle(L.t("set.calculator"), isOn: $s.calculator)
+                Toggle(L.t("set.learnNames"), isOn: $s.learnNames)
+                Toggle(L.t("set.implicitUndo"), isOn: $s.implicitUndo)
+            }
+            Section {
+                ForEach(s.appLayouts.keys.sorted(), id: \.self) { id in
+                    HStack {
+                        Text(appName(id))
+                        Spacer()
+                        Picker("", selection: Binding(
+                            get: { s.appLayouts[id] ?? "en" },
+                            set: { s.appLayouts[id] = $0 })) {
+                            ForEach(Lang.allCases) { l in Text(L.langName(l)).tag(l.rawValue) }
+                        }
+                        .labelsHidden()
+                        .frame(width: 140)
+                        Button(L.t("set.remove")) { s.appLayouts[id] = nil }
+                    }
+                }
+                Button(L.t("set.add")) { addAppLayout() }
+            } header: {
+                Text(L.t("set.appLayouts"))
+            } footer: {
+                Text(L.t("set.appLayouts.hint")).font(.caption).foregroundStyle(.secondary)
+            }
             Section(L.t("set.excluded")) {
                 ForEach(s.excludedApps, id: \.self) { id in
                     HStack {
@@ -145,6 +171,18 @@ struct SettingsView: View {
         guard p.runModal() == .OK else { return }
         for u in p.urls {
             if let id = Bundle(url: u)?.bundleIdentifier, !s.excludedApps.contains(id) { s.excludedApps.append(id) }
+        }
+    }
+
+    private func addAppLayout() {
+        let p = NSOpenPanel()
+        p.allowedContentTypes = [.application]
+        p.directoryURL = URL(fileURLWithPath: "/Applications")
+        p.allowsMultipleSelection = true
+        guard p.runModal() == .OK else { return }
+        let def = LayoutManager.shared.currentLang?.rawValue ?? "en"
+        for u in p.urls {
+            if let id = Bundle(url: u)?.bundleIdentifier, s.appLayouts[id] == nil { s.appLayouts[id] = def }
         }
     }
 
