@@ -1,36 +1,143 @@
 # ExoKey
 
-Automatic keyboard layout switcher for macOS (English / Russian / Ukrainian) — an open-source analog of Punto Switcher / KeyRay.
+**English** · [Українська](#українська)
 
-Type `ghbdtn` in the English layout — ExoKey turns it into `привет` and switches the layout, after the 3rd letter.
+ExoKey fixes text typed in the wrong keyboard layout on macOS (English, Russian, Ukrainian) and suggests the next words with a local AI model. Everything runs on your Mac; no text leaves your computer.
+
+**[⬇ Download the latest release](https://github.com/jandiradmin/ExoKey/releases/latest)** · macOS 13+ · Apple Silicon
 
 ## Features
-- Detection by local dictionaries (word + prefix lookup), no cloud, no neural networks
-- Works with any installed layouts (ABC, US, Russian, Russian – PC, Ukrainian, …) — key mapping is read from the system
-- Undo last correction (⌃⌥Z), manual convert of last word (⌃⌥X), pause (⌃⌥P) — all configurable
-- Learning: undone corrections become exceptions, repeated unknown words go to the user dictionary
-- Dictionary editor: words, exceptions, rules, candidates; import/export, backup/restore
-- Per-app exclusions, secure input (password fields) is never processed
-- Interface in Russian, Ukrainian, English; dark theme
 
-## Requirements
-macOS 13+, Apple Silicon. Permissions: Accessibility and Input Monitoring.
+- **Layout correction:** `ghbdtn` becomes `привет` as you type, with the layout switched to match. ExoKey checks words from the 2nd or 3rd letter against dictionaries of ~4.8M word forms, and checks the whole word again when you finish it.
+- **Any layouts:** ABC, US, Russian, Russian – PC, Ukrainian and others. ExoKey reads the key mapping from macOS and stays idle in other layouts, such as German.
+- **Learning:**
+  - Corrections you undo become exceptions.
+  - New words, names and abbreviations you type repeatedly go to your dictionary.
+  - Words in ALL CAPS are never changed.
+- **AI autocomplete (optional):**
+  - Gray inline suggestions after the cursor.
+  - Uses the text of the current window (chat, email, page) as context.
+  - Only confident parts of a suggestion are shown.
+  - Runs a local Qwen3-4B model through llama.cpp. You download it from Settings: 2.5 GB fast or 4.3 GB accurate.
+  - A light mode completes words from the dictionaries only, without the model.
+- **Phrases:** saved phrases and banned suggestions. ExoKey also learns from suggestions you accept or reject.
+- **Per-app layouts:** pick an app, and ExoKey switches to its layout when you switch to the app. You can set it quickly from the menu bar.
+- **Calculator:** type `2+2=` and ExoKey appends `4`. Supports `+ - * / ^ %` and parentheses.
+- **Dictionary editor:** words, exceptions, rules, candidates, phrases and banned suggestions, with import, export and backup.
+- **Exclusions:** per-app exclusions, separately for layout correction and for autocomplete. Terminals and code editors are excluded by default. Password fields are never processed.
+- **Interface:** English, Ukrainian, Russian, dark theme.
 
-## Build from source
-```
-xcode-select --install
-scripts/fetch_dicts.sh
-scripts/make_dev_cert.sh
-scripts/build_app.sh --install
-```
+## Hotkeys
+
+All hotkeys can be changed in Settings.
+
+| Action | Default |
+|---|---|
+| Undo last correction | ⌃⌥Z |
+| Convert last word / selection to another layout | ⌃⌥X |
+| Pause / resume ExoKey | ⌃⌥P |
+| Accept next word of a suggestion | Tab |
+| Accept whole suggestion | ⇧Tab |
+| Hide suggestion | Esc |
+| Undo inserted suggestion | ⌃⌥⌫ |
+| Autocomplete on / off | ⌃⌥A |
+
+## Install
+
+1. Download `ExoKey-x.y.z.zip` from [Releases](https://github.com/jandiradmin/ExoKey/releases), unzip it and move `ExoKey.app` to **Applications**.
+2. Preview builds are not notarized yet. On first launch, go to **System Settings → Privacy & Security** and click **Open Anyway**.
+3. Allow ExoKey in **Accessibility** and **Input Monitoring**.
+4. ExoKey lives in the menu bar (`EN` / `RU` / `UK`). Settings and the dictionary editor are in its menu. Launching ExoKey again also opens Settings.
 
 ## Privacy
-Typed text is never stored or sent. Only single words you confirm/learn are kept locally in `~/Library/Application Support/ExoKey/user.sqlite`.
 
-## Dictionaries & licenses
-- Word frequencies: [hermitdave/FrequencyWords](https://github.com/hermitdave/FrequencyWords) — CC BY-SA 4.0
-- Word forms: LibreOffice hunspell dictionaries (en_US, ru_RU, uk_UA) — see their respective licenses
-- ExoKey code: MIT
+- Typed text is never stored or sent anywhere.
+- Window text used as context for suggestions is processed in memory only.
+- Only the words, phrases and rules you add, or ExoKey learns, are saved, locally in `~/Library/Application Support/ExoKey/`.
+- The diagnostic log (`~/Library/Logs/ExoKey.log`) contains no typed text.
 
-## Support
-If ExoKey is useful to you, donations are welcome (links coming soon).
+## Build from source
+
+```
+xcode-select --install
+git clone git@github.com:jandiradmin/ExoKey.git && cd ExoKey
+scripts/fetch_dicts.sh          # downloads word lists, builds data/dict/*.exd
+scripts/make_dev_cert.sh        # stable local signing, so permissions survive rebuilds
+scripts/build_app.sh --install  # builds ExoKey.app and installs it to /Applications
+```
+
+The build uses Swift Package Manager with the Command Line Tools, so Xcode is not required. A release is published with `scripts/release.sh <version>`.
+
+## Credits & licenses
+
+- ExoKey code: MIT.
+- Word frequencies: [hermitdave/FrequencyWords](https://github.com/hermitdave/FrequencyWords), CC BY-SA 4.0.
+- Word forms: [LibreOffice dictionaries](https://github.com/LibreOffice/dictionaries) (en_US, ru_RU, uk_UA), under their respective licenses.
+- AI: [llama.cpp](https://github.com/ggml-org/llama.cpp) (MIT) and [Qwen3-4B-Instruct-2507](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507) (Apache 2.0). The model is downloaded on demand and is not bundled.
+
+If ExoKey is useful to you, a donation or a ⭐ is appreciated.
+
+---
+
+## Українська
+
+ExoKey виправляє текст, набраний не в тій розкладці на macOS (англійська, російська, українська), і підказує наступні слова за допомогою локальної моделі ШІ. Усе працює на вашому Mac, текст нікуди не надсилається.
+
+**[⬇ Завантажити останню версію](https://github.com/jandiradmin/ExoKey/releases/latest)** · macOS 13+ · Apple Silicon
+
+### Можливості
+
+- **Виправлення розкладки:** `ghbdsn` перетворюється на `привіт` прямо під час набору, і розкладка перемикається. ExoKey перевіряє слово з 2–3-ї літери за словниками на ~4,8 млн словоформ і ще раз, коли слово завершено.
+- **Будь-які розкладки:** ABC, US, російська, українська та інші. ExoKey бере відповідність клавіш із macOS і нічого не робить в інших розкладках, наприклад у німецькій.
+- **Навчання:**
+  - Скасовані виправлення стають винятками.
+  - Нові слова, імена й скорочення, які ви повторюєте, потрапляють до словника.
+  - Слова ВЕЛИКИМИ літерами ніколи не змінюються.
+- **Автодоповнення ШІ (за бажанням):**
+  - Сірі підказки одразу після курсора.
+  - Враховують текст вікна: листування, лист, сторінку.
+  - Показується лише та частина підказки, у якій модель упевнена.
+  - Працює локальна модель Qwen3-4B через llama.cpp. Її завантажують із Налаштувань: 2,5 ГБ швидка або 4,3 ГБ точна.
+  - Полегшений режим доповнює слова лише за словником, без моделі.
+- **Фрази:** збережені фрази та заборонені підказки. ExoKey також навчається на підказках, які ви прийняли або відхилили.
+- **Розкладка для програм:** оберіть програму, і під час переходу в неї ExoKey вмикає її розкладку. Швидко налаштовується з меню.
+- **Калькулятор:** наберіть `2+2=`, і ExoKey допише `4`.
+- **Редактор словника:** слова, винятки, правила, кандидати, фрази й заборонені підказки, з імпортом, експортом і резервною копією.
+- **Винятки:** окремо для виправлення розкладки й для автодоповнення. Термінали й редактори коду вимкнено за замовчуванням. Поля паролів ніколи не обробляються.
+- **Інтерфейс:** українська, англійська, російська, темна тема.
+
+### Гарячі клавіші
+
+Усі гарячі клавіші можна змінити в Налаштуваннях.
+
+| Дія | За замовчуванням |
+|---|---|
+| Скасувати останнє виправлення | ⌃⌥Z |
+| Перетворити останнє слово в іншу розкладку | ⌃⌥X |
+| Призупинити / увімкнути ExoKey | ⌃⌥P |
+| Прийняти наступне слово підказки | Tab |
+| Прийняти всю підказку | ⇧Tab |
+| Сховати підказку | Esc |
+| Скасувати вставлену підказку | ⌃⌥⌫ |
+| Увімкнути / вимкнути автодоповнення | ⌃⌥A |
+
+### Встановлення
+
+1. Завантажте `ExoKey-x.y.z.zip` з [Releases](https://github.com/jandiradmin/ExoKey/releases), розпакуйте й перенесіть `ExoKey.app` до **Програм**.
+2. Попередні версії ще не нотаризовані. Під час першого запуску відкрийте **Системні параметри → Приватність і безпека** і натисніть **Усе одно відкрити**.
+3. Дозвольте ExoKey доступ у розділах **Доступність** і **Моніторинг введення**.
+4. ExoKey живе в рядку меню (`EN` / `RU` / `UK`). Налаштування й словник відкриваються з його меню, а також при повторному запуску програми.
+
+### Приватність
+
+- Набраний текст не зберігається й нікуди не надсилається.
+- Текст вікна для підказок обробляється лише в пам’яті.
+- Зберігаються тільки слова, фрази й правила, які ви додали або яких ExoKey навчився. Вони лежать локально в `~/Library/Application Support/ExoKey/`.
+
+### Збирання з коду
+
+Інструкцію наведено вище, у розділі [Build from source](#build-from-source).
+
+### Ліцензії
+
+Код ExoKey поширюється під ліцензією MIT. Ліцензії словників, llama.cpp і моделі Qwen3 наведено вище, у розділі [Credits & licenses](#credits--licenses).
