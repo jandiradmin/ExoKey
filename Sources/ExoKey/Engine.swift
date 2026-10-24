@@ -190,9 +190,20 @@ final class Engine {
         }
         let letterElsewhere = active.contains { $0.lang != cur.lang && $0.isLetter(ks) }
         if letterElsewhere {
-            // punctuation right after a valid word ends it; otherwise it's probably a letter in another layout
-            if !keys.isEmpty, wordScore(core(keys, screen), screen) > 0 {
-                return boundary(event: event, ks: ks, cur: cur, kind: .symbol)
+            // Punctuation here, a letter in another layout (";" = "ж", "," = "б", "[" = "х"...).
+            // Compare: "the word is finished" vs "the word continues in the other language".
+            if !keys.isEmpty {
+                let finished = wordScore(core(keys, screen), screen)
+                var continued = 0
+                for l in active where l.lang != screen {
+                    if let t = candidate(keys + [ks], l) { continued = max(continued, prefixScore(t, l.lang)) }
+                }
+                if finished > 0 && continued < finished * 10 {
+                    return boundary(event: event, ks: ks, cur: cur, kind: .symbol)
+                }
+                if finished == 0 && continued == 0 {
+                    return boundary(event: event, ks: ks, cur: cur, kind: .symbol)
+                }
             }
             return appendLetter(ks)
         }
