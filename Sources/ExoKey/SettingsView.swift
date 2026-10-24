@@ -131,13 +131,15 @@ struct AISection: View {
             }
             .pickerStyle(.segmented)
             Stepper("\(L.t("ai.delay")): \(s.aiDelay)", value: $s.aiDelay, in: 100...1500, step: 50)
-            HStack {
-                Text(L.t("ai.langs"))
-                Spacer()
-                ForEach(Lang.allCases) { l in
-                    Toggle(l.short, isOn: Binding(
-                        get: { s.aiLangs.contains(l) },
-                        set: { on in if on { s.aiLangs.insert(l) } else { s.aiLangs.remove(l) } }))
+            LabeledContent(L.t("ai.langs")) {
+                HStack(spacing: 6) {
+                    ForEach(Lang.allCases) { l in
+                        Toggle(l.short, isOn: Binding(
+                            get: { s.aiLangs.contains(l) },
+                            set: { on in if on { s.aiLangs.insert(l) } else { s.aiLangs.remove(l) } }))
+                            .toggleStyle(.button)
+                            .fixedSize()
+                    }
                 }
             }
             Toggle(L.t("ai.windowContext"), isOn: $s.aiWindowContext)
