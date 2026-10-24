@@ -51,6 +51,7 @@ private func keyTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CG
             let code = event.getIntegerValueField(.keyboardEventKeycode)
             let nav: Set<Int64> = [51, 53, 115, 116, 117, 119, 121, 123, 124, 125, 126, 36, 76, 48]
             DispatchQueue.main.async {
+                if code == 36 || code == 76 { Predictor.shared.messageSent() }
                 if nav.contains(code) && code != 51 { Predictor.shared.hide(); return }
                 Predictor.shared.keyTyped(code: code, typed: code == 51 ? nil : typed)
             }

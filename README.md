@@ -6,6 +6,8 @@ ExoKey fixes text typed in the wrong keyboard layout on macOS (English, Russian,
 
 **[⬇ Download the latest release](https://github.com/jandiradmin/ExoKey/releases/latest)** · macOS 13+ · Apple Silicon
 
+![ExoKey demo: layout fix, learning, AI autocomplete, phrases, per-app layouts, calculator](docs/media/demo-en.gif)
+
 ## Features
 
 - **Layout correction:** `ghbdtn` becomes `привет` as you type, with the layout switched to match. ExoKey checks words from the 2nd or 3rd letter against dictionaries of ~4.8M word forms, and checks the whole word again when you finish it.
@@ -84,6 +86,8 @@ If ExoKey is useful to you, a donation or a ⭐ is appreciated.
 ExoKey виправляє текст, набраний не в тій розкладці на macOS (англійська, російська, українська), і підказує наступні слова за допомогою локальної моделі ШІ. Усе працює на вашому Mac, текст нікуди не надсилається.
 
 **[⬇ Завантажити останню версію](https://github.com/jandiradmin/ExoKey/releases/latest)** · macOS 13+ · Apple Silicon
+
+![Демо ExoKey: розкладка, навчання, автодоповнення ШІ, фрази, розкладка для програм, калькулятор](docs/media/demo-uk.gif)
 
 ### Можливості
 

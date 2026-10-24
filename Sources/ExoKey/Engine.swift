@@ -104,6 +104,9 @@ final class Engine {
         let code = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags
         if recordingHotkey { return .pass }
+        if !flags.intersection([.maskControl, .maskAlternate, .maskCommand]).isEmpty {
+            Log.write("combo code=\(code) mods=\(flags.intersection(Hotkey.relevant).rawValue) convert=\(settings.hkConvert.keyCode)/\(settings.hkConvert.mods)")
+        }
 
         if settings.hkPause.matches(code: code, flags: flags) {
             settings.enabled.toggle()

@@ -7,3 +7,4 @@ data/raw/
 data/dict/
 build.log
 data/brew.log
+tools/.venv/

@@ -57,6 +57,7 @@ final class UserStore: ObservableObject {
           UNIQUE(kind, lang, word));
         """)
         exec("CREATE TABLE IF NOT EXISTS ngrams(key TEXT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0)")
+        exec("CREATE TABLE IF NOT EXISTS style(id INTEGER PRIMARY KEY AUTOINCREMENT, app TEXT, lang TEXT, text TEXT UNIQUE, at REAL)")
     }
 
     @discardableResult
@@ -199,6 +200,47 @@ final class UserStore: ObservableObject {
     func userCompletions(_ prefix: String, _ l: Lang) -> [String] {
         (wordsByLang[l] ?? []).filter { $0.hasPrefix(prefix) && $0 != prefix }
     }
+
+    // MARK: writing style (opt-in): the user's own finished sentences
+
+    func styleAdd(_ text: String, app: String, lang: Lang) {
+        var st: OpaquePointer?
+        if sqlite3_prepare_v2(db, "INSERT OR REPLACE INTO style(app,lang,text,at) VALUES(?,?,?,?)", -1, &st, nil) == SQLITE_OK {
+            bind(st, 1, app); bind(st, 2, lang.rawValue); bind(st, 3, text)
+            sqlite3_bind_double(st, 4, Date().timeIntervalSince1970)
+            sqlite3_step(st)
+        }
+        sqlite3_finalize(st)
+        exec("DELETE FROM style WHERE id NOT IN (SELECT id FROM style ORDER BY at DESC LIMIT 400)")
+    }
+
+    /// Newest sentences: same app first, then same language.
+    func styleExamples(app: String?, lang: Lang, limit: Int) -> [String] {
+        var out: [String] = []
+        var st: OpaquePointer?
+        let sql = "SELECT text FROM style WHERE lang=? ORDER BY (app=?) DESC, at DESC LIMIT ?"
+        if sqlite3_prepare_v2(db, sql, -1, &st, nil) == SQLITE_OK {
+            bind(st, 1, lang.rawValue); bind(st, 2, app ?? "")
+            sqlite3_bind_int(st, 3, Int32(limit))
+            while sqlite3_step(st) == SQLITE_ROW {
+                if let t = sqlite3_column_text(st, 0) { out.append(String(cString: t)) }
+            }
+        }
+        sqlite3_finalize(st)
+        return out.reversed()
+    }
+
+    func styleCount() -> Int {
+        var st: OpaquePointer?
+        var n = 0
+        if sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM style", -1, &st, nil) == SQLITE_OK, sqlite3_step(st) == SQLITE_ROW {
+            n = Int(sqlite3_column_int(st, 0))
+        }
+        sqlite3_finalize(st)
+        return n
+    }
+
+    func styleClear() { exec("DELETE FROM style") }
 
     private var lastError: String { db.map { String(cString: sqlite3_errmsg($0)) } ?? "no database" }
 

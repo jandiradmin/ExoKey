@@ -20,6 +20,7 @@ final class Predictor {
     private var anchorKind: AnchorKind = .char
     private var lastReason = ""
     private var enabledPids: Set<pid_t> = []
+    private var lastFieldText = ""       // field text from the latest read (for style learning on Return)
 
     // last insertion (for undo and learning)
     private var lastInsert = ""
@@ -78,6 +79,12 @@ final class Predictor {
         if keysSinceInsert == 1, code == 51, !lastInsert.isEmpty {
             recordRejection()                      // erased right after accepting
         }
+        if Settings.shared.aiLearnStyle, let t = typed, t.count == 1, ".!?…".contains(t) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                guard let self = self, let ctx = self.readContext() else { return }
+                StyleMemory.shared.capture(fieldText: ctx.text, app: NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "")
+            }
+        }
         guard available else { hide(); return }
         if isVisible, let t = typed, t.count == 1, suggestion.hasPrefix(t) {
             suggestion.removeFirst()               // user types what we suggested — keep the rest
@@ -126,6 +133,7 @@ final class Predictor {
             part = out
         }
         Injector.lastWasAccept = true
+        StyleMemory.shared.lastShown?.accepted = true
         Injector.type(part)
         lastInsert = part
         lastInsertLang = suggestionLang
@@ -243,6 +251,7 @@ final class Predictor {
         if !restOfLine.unicodeScalars.allSatisfy({ Self.invisible.contains($0) }) { return fail("text-after-caret") }
         let start = max(0, loc - 2000)
         let text = ns.substring(with: NSRange(location: start, length: loc - start))
+        lastFieldText = text
 
         // 1) bounds of the previous character / empty range
         if loc > 0, ns.substring(with: NSRange(location: loc - 1, length: 1)) != "\n" {
@@ -304,15 +313,7 @@ final class Predictor {
         if useModel {
             var prompt = text
             while prompt.last == " " { prompt.removeLast() }
-            if s.aiWindowContext, let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
-                let win = WindowContext.shared.text(for: pid)
-                if !win.isEmpty {
-                    // conversation / page above, then what the user is typing
-                    let field = prompt.suffix(1500)
-                    let w = win.replacingOccurrences(of: String(field.prefix(200)), with: "")
-                    prompt = String(w.suffix(2500)) + "\n\n" + field
-                }
-            }
+            prompt = buildPrompt(draft: prompt, lang: lang)
             let afterSpace = lastChar == " "
             let maxWords = s.aiPhrases ? max(1, s.aiMaxWords) : 1
             consumed = ""
@@ -337,7 +338,51 @@ final class Predictor {
         }
     }
 
+    /// Prompt = (style examples) + meaningful context above the field + the user's draft.
+    private func buildPrompt(draft: String, lang: Lang) -> String {
+        let s = Settings.shared
+        let app = NSWorkspace.shared.frontmostApplication
+        var head = ""
+        let styles = s.aiLearnStyle ? StyleMemory.shared.examples(app: app?.bundleIdentifier, lang: lang, limit: 8) : []
+        if !styles.isEmpty {
+            head += styles.map { "- " + $0 }.joined(separator: "\n") + "\n\n"
+        }
+        var field = String(draft.suffix(1500))
+        if s.aiWindowContext, let pid = app?.processIdentifier {
+            let ctx = WindowContext.shared.context(for: pid)
+            var win = ctx.text
+            // the field's own text may also be visible in the window — don't repeat it
+            let probe = String(field.prefix(120))
+            if probe.count > 10 { win = win.replacingOccurrences(of: probe, with: "") }
+            if !win.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                head += win + "\n"
+            }
+        }
+        if field.isEmpty { field = draft }
+        let prompt = head + field
+        if UserDefaults.standard.bool(forKey: "aiDebug") {
+            try? ("[\(app?.bundleIdentifier ?? "-")]\n" + prompt).write(
+                to: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/ExoKey-ai-prompt.txt"),
+                atomically: true, encoding: .utf8)
+        }
+        return prompt
+    }
+
+    /// Return pressed (message sent / paragraph finished): learn from the text typed so far.
+    func messageSent() {
+        guard Settings.shared.aiLearnStyle, !lastFieldText.isEmpty else { return }
+        StyleMemory.shared.capture(fieldText: lastFieldText, app: NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "")
+        lastFieldText = ""
+    }
+
     private func present(_ s: String, _ ctx: Ctx, _ lang: Lang) {
+        if Settings.shared.aiLearnStyle {
+            let app = NSWorkspace.shared.frontmostApplication
+            StyleMemory.shared.lastShown = StyleMemory.Shown(
+                draft: ctx.text, suggestion: s, accepted: false,
+                context: app.map { WindowContext.shared.context(for: $0.processIdentifier).text } ?? "",
+                app: app?.bundleIdentifier ?? "")
+        }
         suggestion = s
         suggestionLang = lang
         anchor = ctx.anchor

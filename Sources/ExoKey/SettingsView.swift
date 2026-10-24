@@ -141,6 +141,9 @@ struct AISection: View {
                 }
             }
             Toggle(L.t("ai.windowContext"), isOn: $s.aiWindowContext)
+            Toggle(L.t("ai.learnStyle"), isOn: $s.aiLearnStyle)
+            Text(L.t("ai.learnStyle.hint")).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Button(L.t("ai.learnStyle.clear")) { StyleMemory.shared.clear() }
             Toggle(L.t("ai.personal"), isOn: $s.aiPersonalization)
             Toggle(L.t("ai.learnPhrases"), isOn: $s.learnPhrases).disabled(!s.aiPersonalization)
             Button(L.t("ai.clear")) { UserStore.shared.clearPersonalization() }
