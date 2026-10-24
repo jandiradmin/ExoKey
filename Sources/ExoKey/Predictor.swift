@@ -61,7 +61,7 @@ final class Predictor {
 
     private var available: Bool {
         let s = Settings.shared
-        guard s.aiEnabled, !IsSecureEventInputEnabled() else { return false }
+        guard s.aiEnabled, !IsSecureEventInputEnabled(), !FieldGuard.focusedIsSensitive() else { return false }
         if let id = NSWorkspace.shared.frontmostApplication?.bundleIdentifier, s.isAIExcluded(id) { return false }
         guard let l = LayoutManager.shared.currentLang, s.aiLangs.contains(l) else { return false }
         return true

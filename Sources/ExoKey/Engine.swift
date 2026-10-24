@@ -179,7 +179,11 @@ final class Engine {
             return boundary(event: event, ks: ks, cur: cur, kind: code == 49 ? .space : .control)
         }
 
-        if keys.isEmpty { screenLang = cur.lang; visited = [cur.lang] }
+        if keys.isEmpty {
+            // first key of a word: skip password-like fields (checked once per field)
+            if FieldGuard.focusedIsSensitive() { return .pass }
+            screenLang = cur.lang; visited = [cur.lang]
+        }
         let screen = screenLang ?? cur.lang
 
         // Is this key part of a word?

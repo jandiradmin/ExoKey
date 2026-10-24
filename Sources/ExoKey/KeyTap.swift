@@ -61,6 +61,7 @@ private func keyTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CG
         return Unmanaged.passUnretained(event)
     case .leftMouseDown, .rightMouseDown, .otherMouseDown:
         Engine.shared.reset()
+        FieldGuard.reset()
         Predictor.shared.hide()
         return Unmanaged.passUnretained(event)
     default:
