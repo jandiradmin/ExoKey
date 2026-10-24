@@ -34,7 +34,7 @@ All hotkeys can be changed in Settings.
 | Action | Default |
 |---|---|
 | Undo last correction | ⌃⌥Z |
-| Convert last word / selection to another layout | ⌃⌥X |
+| Convert last word to another layout | ⌃⌥X |
 | Pause / resume ExoKey | ⌃⌥P |
 | Accept next word of a suggestion | Tab |
 | Accept whole suggestion | ⇧Tab |
