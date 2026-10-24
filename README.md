@@ -26,7 +26,8 @@ ExoKey fixes text typed in the wrong keyboard layout on macOS (English, Russian,
 - **Per-app layouts:** pick an app, and ExoKey switches to its layout when you switch to the app. You can set it quickly from the menu bar.
 - **Calculator:** type `2+2=` and ExoKey appends `4`. Supports `+ - * / ^ %` and parentheses.
 - **Dictionary editor:** words, exceptions, rules, candidates, phrases and banned suggestions, with import, export and backup.
-- **Exclusions:** per-app exclusions, separately for layout correction and for autocomplete. Terminals and code editors are excluded by default. Password fields are never processed.
+- **Passwords are never touched:** ExoKey skips password fields, both the protected ones and fields labeled password, PIN or code. Words with digits are never corrected, so `ghbdtn123` stays as typed. For a one-off case, pause ExoKey with ⌃⌥P.
+- **Exclusions:** per-app exclusions, separately for layout correction and for autocomplete. Terminals and code editors are excluded by default.
 - **Interface:** English, Ukrainian, Russian, dark theme.
 
 ## Hotkeys
@@ -107,7 +108,8 @@ ExoKey виправляє текст, набраний не в тій розкл
 - **Розкладка для програм:** оберіть програму, і під час переходу в неї ExoKey вмикає її розкладку. Швидко налаштовується з меню.
 - **Калькулятор:** наберіть `2+2=`, і ExoKey допише `4`.
 - **Редактор словника:** слова, винятки, правила, кандидати, фрази й заборонені підказки, з імпортом, експортом і резервною копією.
-- **Винятки:** окремо для виправлення розкладки й для автодоповнення. Термінали й редактори коду вимкнено за замовчуванням. Поля паролів ніколи не обробляються.
+- **Паролі не чіпаються:** ExoKey пропускає поля паролів, і захищені, і ті, що підписані як пароль, PIN чи код. Слова з цифрами не виправляються, тож `ghbdtn123` лишиться як є. Для разового випадку призупиніть ExoKey через ⌃⌥P.
+- **Винятки:** окремо для виправлення розкладки й для автодоповнення. Термінали й редактори коду вимкнено за замовчуванням.
 - **Інтерфейс:** українська, англійська, російська, темна тема.
 
 ### Гарячі клавіші
