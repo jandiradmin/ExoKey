@@ -73,7 +73,7 @@ enum L {
         "set.add": ("Добавить…", "Додати…", "Add…"),
         "set.remove": ("Удалить", "Видалити", "Remove"),
         "set.appLayouts": ("Раскладка для программ", "Розкладка для програм", "Layout per app"),
-        "set.appLayouts.hint": ("При переходе в программу включается выбранная раскладка", "Під час переходу в програму вмикається вибрана розкладка", "Switching to the app selects this layout"),
+        "set.appLayouts.hint": ("При переходе в программу включается выбранная раскладка. Автоисправление в ней переключает только на этот язык.", "Під час переходу в програму вмикається вибрана розкладка. Автовиправлення в ній перемикає лише на цю мову.", "Switching to the app selects this layout. Auto-correction there only switches to this language."),
         "set.extras": ("Дополнительно", "Додатково", "Extras"),
         "set.calculator": ("Калькулятор: 2+2= → 4", "Калькулятор: 2+2= → 4", "Calculator: 2+2= → 4"),
         "set.learnNames": ("Быстро запоминать имена, названия и сокращения", "Швидко запам’ятовувати імена, назви й скорочення", "Quickly learn names, places and abbreviations"),

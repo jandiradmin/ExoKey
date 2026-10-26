@@ -41,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
         settings.$excludedApps.sink { [weak self] _ in DispatchQueue.main.async { self?.updateExcluded() } }.store(in: &bag)
+        settings.$appLayouts.sink { [weak self] _ in DispatchQueue.main.async { self?.updateExcluded() } }.store(in: &bag)
         settings.$enabled.sink { [weak self] _ in DispatchQueue.main.async { self?.updateStatus() } }.store(in: &bag)
         updateExcluded()
 
@@ -104,6 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func updateExcluded() {
         let id = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? ""
         Engine.shared.excludedApp = settings.excludedApps.contains(id)
+        Engine.shared.lockedLang = settings.appLayouts[id].flatMap(Lang.init(rawValue:))
     }
 
     func updateStatus() {

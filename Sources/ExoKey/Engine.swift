@@ -11,6 +11,8 @@ final class Engine {
     private(set) var dicts: [Lang: WordDictionary] = [:]
 
     var excludedApp = false
+    /// Language assigned to the frontmost app: automatic corrections may only switch to it.
+    var lockedLang: Lang?
     var recordingHotkey = false
     var onStateChange: (() -> Void)?
 
@@ -373,9 +375,11 @@ final class Engine {
 
     private struct Alt { let lang: Lang; let text: String; let score: Int }
 
-    private func alternatives(_ keys: [KeyStroke], excluding o: Lang, score: (String, Lang) -> Int, minScore: Int) -> [Alt] {
+    private func alternatives(_ keys: [KeyStroke], excluding o: Lang, score: (String, Lang) -> Int, minScore: Int,
+                              manual: Bool = false) -> [Alt] {
         var out: [Alt] = []
         for l in active where l.lang != o && !visited.contains(l.lang) {
+            if !manual, let lock = lockedLang, l.lang != lock { continue }
             guard let t = candidate(keys, l) else { continue }
             let s = score(t, l.lang)
             if s >= minScore { out.append(Alt(lang: l.lang, text: t, score: s)) }
@@ -415,7 +419,7 @@ final class Engine {
         guard !oText.isEmpty, !store.isException(oText, o) else { return nil }
         // explicit user rule
         if let r = store.find(.rule, o, oText), r.source == .manual, let tl = r.targetLang, !visited.contains(tl) || tl == o {
-            if tl != o { return tl }
+            if tl != o && (lockedLang == nil || lockedLang == tl) { return tl }
         }
         let fO = wordScore(oText, o)
         let pO = prefixScore(oText, o)
@@ -521,8 +525,8 @@ final class Engine {
         if convertCycle.isEmpty {
             let saved = visited
             visited = []
-            var alts = alternatives(keys, excluding: from, score: wordScore, minScore: 1)
-            if alts.isEmpty { alts = alternatives(keys, excluding: from, score: prefixScore, minScore: 1) }
+            var alts = alternatives(keys, excluding: from, score: wordScore, minScore: 1, manual: true)
+            if alts.isEmpty { alts = alternatives(keys, excluding: from, score: prefixScore, minScore: 1, manual: true) }
             visited = saved
             var order = alts.map(\.lang)
             for l in langs where l != from && !order.contains(l) { order.append(l) }
