@@ -42,6 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         settings.$excludedApps.sink { [weak self] _ in DispatchQueue.main.async { self?.updateExcluded() } }.store(in: &bag)
         settings.$appLayouts.sink { [weak self] _ in DispatchQueue.main.async { self?.updateExcluded() } }.store(in: &bag)
+        settings.$appLayoutLocks.sink { [weak self] _ in DispatchQueue.main.async { self?.updateExcluded() } }.store(in: &bag)
         settings.$enabled.sink { [weak self] _ in DispatchQueue.main.async { self?.updateStatus() } }.store(in: &bag)
         updateExcluded()
 
@@ -105,7 +106,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func updateExcluded() {
         let id = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? ""
         Engine.shared.excludedApp = settings.excludedApps.contains(id)
-        Engine.shared.lockedLang = settings.appLayouts[id].flatMap(Lang.init(rawValue:))
+        Engine.shared.lockedLang = settings.appLayoutLocks.contains(id) ? settings.appLayouts[id].flatMap(Lang.init(rawValue:)) : nil
     }
 
     func updateStatus() {
@@ -157,6 +158,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 it.state = current == l.rawValue ? .on : .off
                 sub.addItem(it)
             }
+            sub.addItem(.separator())
+            let lock = NSMenuItem(title: L.t("set.appLayouts.lock"), action: #selector(toggleAppLock(_:)), keyEquivalent: "")
+            lock.target = self
+            lock.representedObject = id
+            lock.state = settings.appLayoutLocks.contains(id) ? .on : .off
+            lock.isEnabled = current != nil
+            sub.addItem(lock)
             let parent = NSMenuItem(title: L.t("menu.appLayout", name), action: nil, keyEquivalent: "")
             parent.submenu = sub
             menu.addItem(parent)
@@ -176,6 +184,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let i = NSMenuItem(title: t, action: sel, keyEquivalent: "")
         i.target = self
         return i
+    }
+
+    @objc private func toggleAppLock(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        if settings.appLayoutLocks.contains(id) { settings.appLayoutLocks.removeAll { $0 == id } }
+        else { settings.appLayoutLocks.append(id) }
     }
 
     @objc private func setAppLayout(_ sender: NSMenuItem) {

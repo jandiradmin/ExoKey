@@ -14,9 +14,17 @@ final class KeyTap {
         if tap != nil { return true }
         let types: [CGEventType] = [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown]
         let mask = types.reduce(CGEventMask(0)) { $0 | (CGEventMask(1) << $1.rawValue) }
-        guard let t = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap,
+        // HID level first: we see keys before other apps' global hotkeys take them (e.g. ⌃⌥X)
+        var created = CGEvent.tapCreate(tap: .cghidEventTap, place: .headInsertEventTap,
                                         options: .defaultTap, eventsOfInterest: mask,
-                                        callback: keyTapCallback, userInfo: nil) else { return false }
+                                        callback: keyTapCallback, userInfo: nil)
+        Log.write("tap level: \(created != nil ? "hid" : "session")")
+        if created == nil {
+            created = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap,
+                                        options: .defaultTap, eventsOfInterest: mask,
+                                        callback: keyTapCallback, userInfo: nil)
+        }
+        guard let t = created else { return false }
         tap = t
         source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, t, 0)
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
@@ -44,11 +52,10 @@ private func keyTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CG
             return nil
         }
         if event.flags.intersection([.maskCommand, .maskControl]).isEmpty {
-            var len = 0
-            var chars = [UniChar](repeating: 0, count: 4)
-            event.keyboardGetUnicodeString(maxStringLength: 4, actualStringLength: &len, unicodeString: &chars)
-            let typed = len > 0 ? String(utf16CodeUnits: chars, count: len) : nil
+            // at HID level the event has no text yet: take the character from the current layout
             let code = event.getIntegerValueField(.keyboardEventKeycode)
+            let ks = KeyStroke(code: UInt16(code), shift: event.flags.contains(.maskShift), caps: event.flags.contains(.maskAlphaShift))
+            let typed = LayoutManager.shared.current?.char(ks)
             let nav: Set<Int64> = [51, 53, 115, 116, 117, 119, 121, 123, 124, 125, 126, 36, 76, 48]
             DispatchQueue.main.async {
                 if code == 36 || code == 76 { Predictor.shared.messageSent() }

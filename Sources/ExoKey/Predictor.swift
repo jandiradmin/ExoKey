@@ -275,7 +275,8 @@ final class Predictor {
                 return Ctx(text: text, anchor: rect, kind: .caret)
             }
         }
-        // 3) fallback: small panel under the text field
+        // 3) fallback: small panel under the text field (off: users found it confusing)
+        guard UserDefaults.standard.bool(forKey: "aiPanelFallback") else { return fail("no-caret") }
         var pos: CFTypeRef?, size: CFTypeRef?
         if AXUIElementCopyAttributeValue(e, kAXPositionAttribute as CFString, &pos) == .success,
            AXUIElementCopyAttributeValue(e, kAXSizeAttribute as CFString, &size) == .success,

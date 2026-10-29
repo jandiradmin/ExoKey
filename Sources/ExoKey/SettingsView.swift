@@ -236,7 +236,12 @@ struct SettingsView: View {
                         }
                         .labelsHidden()
                         .frame(width: 140)
-                        Button(L.t("set.remove")) { s.appLayouts[id] = nil }
+                        Toggle(L.t("set.appLayouts.lock"), isOn: Binding(
+                            get: { s.appLayoutLocks.contains(id) },
+                            set: { on in if on { if !s.appLayoutLocks.contains(id) { s.appLayoutLocks.append(id) } } else { s.appLayoutLocks.removeAll { $0 == id } } }))
+                            .toggleStyle(.checkbox)
+                            .fixedSize()
+                        Button(L.t("set.remove")) { s.appLayouts[id] = nil; s.appLayoutLocks.removeAll { $0 == id } }
                     }
                 }
                 Button(L.t("set.add")) { addAppLayout() }
