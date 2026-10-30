@@ -305,7 +305,7 @@ final class Predictor {
 
     private func request() {
         let gen = generation
-        guard available, !Engine.shared.wordUncertain else { return }
+        guard available, !Engine.shared.wordUncertain, !SpellFix.shared.isOffering else { return }
         guard let ctx = readContext() else { return }
         let text = ctx.text
         guard text.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2,

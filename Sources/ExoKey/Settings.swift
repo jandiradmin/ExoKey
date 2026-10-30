@@ -80,6 +80,9 @@ final class Settings: ObservableObject {
     @Published var aiConfidence: Int { didSet { d.set(aiConfidence, forKey: "aiConfidence") } }
     @Published var aiLearnStyle: Bool { didSet { d.set(aiLearnStyle, forKey: "aiLearnStyle") } }
     /// 0 off, 1 on layout change, 2 always while typing
+    /// 0 off, 1 suggest (Tab), 2 replace automatically
+    @Published var spellMode: Int { didSet { d.set(spellMode, forKey: "spellMode") } }
+    @Published var hkSpell: Hotkey { didSet { save(hkSpell, "hkSpell") } }
     @Published var badgeMode: Int { didSet { d.set(badgeMode, forKey: "badgeMode") } }
     @Published var fixNameCase: Bool { didSet { d.set(fixNameCase, forKey: "fixNameCase") } }
     @Published var aiWindowContext: Bool { didSet { d.set(aiWindowContext, forKey: "aiWindowContext") } }
@@ -117,7 +120,7 @@ final class Settings: ObservableObject {
             "repeatCount": 3, "undosToException": 2, "notifications": true, "uiLang": UILang.system.rawValue,
             "excludedApps": ["com.apple.Terminal", "com.googlecode.iterm2", "com.apple.keychainaccess"],
             "activeLangs": ["en", "ru", "uk"],
-            "aiEnabled": false, "aiMode": AIMode.model.rawValue, "aiPhrases": true, "badgeMode": 1, "fixNameCase": false, "aiLearnStyle": false, "aiVariant": AIVariant.fast.rawValue, "aiWindowContext": true, "aiMaxWords": 6, "aiDelay": 120, "aiConfidence": 1,
+            "aiEnabled": false, "aiMode": AIMode.model.rawValue, "aiPhrases": true, "badgeMode": 1, "spellMode": 1, "fixNameCase": false, "aiLearnStyle": false, "aiVariant": AIVariant.fast.rawValue, "aiWindowContext": true, "aiMaxWords": 6, "aiDelay": 120, "aiConfidence": 1,
             "aiLangs": ["en", "ru", "uk"], "aiPersonalization": true, "learnPhrases": false,
             "aiExcludedApps": ["com.apple.Terminal", "com.googlecode.iterm2", "com.microsoft.VSCode",
                                "com.todesktop.230313mzl4w4u92", "com.apple.dt.Xcode", "dev.zed.Zed", "dev.warp.Warp-Stable",
@@ -141,6 +144,7 @@ final class Settings: ObservableObject {
         aiPhrases = d.bool(forKey: "aiPhrases")
         aiWindowContext = d.bool(forKey: "aiWindowContext")
         badgeMode = d.integer(forKey: "badgeMode")
+        spellMode = d.integer(forKey: "spellMode")
         fixNameCase = d.bool(forKey: "fixNameCase")
         aiLearnStyle = d.bool(forKey: "aiLearnStyle")
         aiConfidence = d.integer(forKey: "aiConfidence")
@@ -160,6 +164,7 @@ final class Settings: ObservableObject {
         hkUndo = Self.load(d, "hkUndo") ?? Hotkey(keyCode: 6, mods: ctrlOpt)      // ⌃⌥Z
         hkConvert = Self.load(d, "hkConvert") ?? Hotkey(keyCode: 7, mods: ctrlOpt) // ⌃⌥X
         hkPause = Self.load(d, "hkPause") ?? Hotkey(keyCode: 35, mods: ctrlOpt)    // ⌃⌥P
+        hkSpell = Self.load(d, "hkSpell") ?? Hotkey(keyCode: 8, mods: ctrlOpt)   // ⌃⌥C
         hkAcceptWord = Self.load(d, "hkAcceptWord") ?? Hotkey(keyCode: 48, mods: 0) // Tab
         hkAcceptAll = Self.load(d, "hkAcceptAll") ?? Hotkey(keyCode: 48, mods: CGEventFlags.maskShift.rawValue) // ⇧Tab
         hkHide = Self.load(d, "hkHide") ?? Hotkey(keyCode: 53, mods: 0)            // Esc

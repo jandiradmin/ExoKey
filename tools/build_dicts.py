@@ -136,6 +136,9 @@ def build(lang):
         f.write(struct.pack('<%dI' % len(offsets), *offsets))
         f.write(struct.pack('<%dI' % len(cums), *cums))
         f.write(data)
+    # frequency-list words unknown to Hunspell: slang, rare words and typos ("првиет", "recieve")
+    with open(os.path.join(OUT, lang + '.unverified'), 'w', encoding='utf-8') as f:
+        f.write('\n'.join(sorted(w for w in counts if w not in hun and w in freq)))
     with open(os.path.join(OUT, lang + '.names'), 'w', encoding='utf-8') as f:
         f.write('\n'.join(sorted(n for n in names if n in freq)))
     print(lang, 'names', len(names), end=' ')

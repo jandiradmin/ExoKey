@@ -53,6 +53,7 @@ final class SettingsUIState: ObservableObject {
     let recUndo = HotkeyRecorder()
     let recConvert = HotkeyRecorder()
     let recPause = HotkeyRecorder()
+    let recSpell = HotkeyRecorder()
 }
 
 final class AIRecorders {
@@ -217,8 +218,15 @@ struct SettingsView: View {
                 LabeledContent(L.t("hk.undo")) { HotkeyField(hotkey: $s.hkUndo, rec: ui.recUndo) }
                 LabeledContent(L.t("hk.convert")) { HotkeyField(hotkey: $s.hkConvert, rec: ui.recConvert) }
                 LabeledContent(L.t("hk.pause")) { HotkeyField(hotkey: $s.hkPause, rec: ui.recPause) }
+                LabeledContent(L.t("hk.spell")) { HotkeyField(hotkey: $s.hkSpell, rec: ui.recSpell) }
             }
             Section(L.t("set.extras")) {
+                Picker(L.t("set.spell"), selection: Binding(get: { s.spellMode }, set: { s.spellMode = $0; SpellFix.shared.warmUp() })) {
+                    Text(L.t("set.spell.0")).tag(0)
+                    Text(L.t("set.spell.1")).tag(1)
+                    Text(L.t("set.spell.2")).tag(2)
+                }
+                .pickerStyle(.segmented)
                 Picker(L.t("set.badge"), selection: $s.badgeMode) {
                     Text(L.t("set.badge.0")).tag(0)
                     Text(L.t("set.badge.1")).tag(1)

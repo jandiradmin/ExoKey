@@ -45,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { LayoutBadge.shared.flash() }
         }
         _ = NameCase.shared
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { SpellFix.shared.warmUp() }
         settings.$excludedApps.sink { [weak self] _ in DispatchQueue.main.async { self?.updateExcluded() } }.store(in: &bag)
         settings.$appLayouts.sink { [weak self] _ in DispatchQueue.main.async { self?.updateExcluded() } }.store(in: &bag)
         settings.$appLayoutLocks.sink { [weak self] _ in DispatchQueue.main.async { self?.updateExcluded() } }.store(in: &bag)

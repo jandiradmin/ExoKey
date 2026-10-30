@@ -172,6 +172,29 @@ final class WordDictionary {
         return (w, b.1)
     }
 
+    /// Sequential scan of all words with frequency >= minFreq.
+    func forEach(minFreq: Int, _ body: (UnsafeBufferPointer<UInt8>, Int) -> Void) {
+        var pos = dataPos
+        var cur = [UInt8](repeating: 0, count: 256)
+        var len = 0
+        for i in 0..<count {
+            if i % blockSize == 0 {
+                pos = dataPos + u32(offsetsPos + (i / blockSize) * 4)
+                len = varint(&pos)
+                for j in 0..<len { cur[j] = byte(pos + j) }
+                pos += len
+            } else {
+                let shared = Int(byte(pos)); pos += 1
+                let suf = varint(&pos)
+                for j in 0..<suf { cur[shared + j] = byte(pos + j) }
+                pos += suf
+                len = shared + suf
+            }
+            let fr = varint(&pos)
+            if fr >= minFreq { cur.withUnsafeBufferPointer { body(UnsafeBufferPointer(rebasing: $0[0..<len]), fr) } }
+        }
+    }
+
     func freq(_ word: String) -> Int {
         let k = Array(word.utf8)
         guard !k.isEmpty, k.count < 200 else { return 0 }

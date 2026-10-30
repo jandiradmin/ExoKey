@@ -108,6 +108,7 @@ final class Engine {
         let code = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags
         if recordingHotkey { return .pass }
+        if SpellFix.shared.keyDown(code: code, flags: flags) { reset(); return .swallow }
         if !flags.intersection([.maskControl, .maskAlternate, .maskCommand]).isEmpty {
             Log.write("combo code=\(code) mods=\(flags.intersection(Hotkey.relevant).rawValue) convert=\(settings.hkConvert.keyCode)/\(settings.hkConvert.mods)")
         }
@@ -140,6 +141,10 @@ final class Engine {
             if settings.hkAcceptAll.matches(code: code, flags: flags) { pred.accept(all: true); reset(); return .swallow }
             if settings.hkAcceptWord.matches(code: code, flags: flags) { pred.accept(all: false); reset(); return .swallow }
             if settings.hkHide.matches(code: code, flags: flags) { pred.dismiss(); return .swallow }
+        }
+        if settings.hkSpell.matches(code: code, flags: flags) {
+            if settings.enabled, !excludedApp { spellHotkey() }
+            return .swallow
         }
         if settings.hkConvert.matches(code: code, flags: flags) {
             if settings.enabled, !excludedApp { convert() }
@@ -291,6 +296,9 @@ final class Engine {
             result = .swallow
         } else {
             learnUnknown(screen)
+            if kind != .control, !disabled, let l = layouts.layouts[screen], !untouchableCase(keys, final: true) {
+                SpellFix.shared.wordFinished(l.text(keys), lang: screen, boundary: cur.char(ks) ?? "")
+            }
         }
         finishWord(endedWithSpace: kind == .space)
         sentenceStart = pendingSentenceEnd
@@ -490,6 +498,7 @@ final class Engine {
     // MARK: - Undo
 
     func undo() {
+        if SpellFix.shared.undoLast() { reset(); return }
         if !keys.isEmpty, let c = correction, let cur = screenLang,
            let curL = layouts.layouts[cur], let fromL = layouts.layouts[c.from] {
             layouts.select(c.from)
@@ -521,6 +530,18 @@ final class Engine {
             if let r = store.find(.rule, c.from, original) { store.delete(r) }
             _ = store.touch(.exception, c.from, original)
             Notifier.show(L.t("notif.exception", original))
+        }
+    }
+
+    // MARK: - Typo fix by hotkey
+
+    private func spellHotkey() {
+        if !keys.isEmpty, let lang = screenLang, let l = layouts.layouts[lang] {
+            SpellFix.shared.fixNow(l.text(keys), lang: lang, boundary: "")
+            reset()
+        } else if let lst = last, let l = layouts.layouts[lst.lang] {
+            SpellFix.shared.fixNow(l.text(lst.keys), lang: lst.lang, boundary: " ")
+            last = nil
         }
     }
 
