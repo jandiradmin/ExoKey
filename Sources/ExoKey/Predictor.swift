@@ -565,9 +565,13 @@ final class Predictor {
         label.textColor = NSColor(white: 0.55, alpha: 0.85)
         label.stringValue = suggestion
         let size = label.fittingSize
-        let x = anchorKind == .char ? anchor.maxX : anchor.minX
+        // NSTextField draws its text ~2pt inside its frame; fine-tune with hidden defaults aiGhostDX / aiGhostDY
+        let d = UserDefaults.standard
+        let dx = d.object(forKey: "aiGhostDX") as? Double ?? -2
+        let dy = d.object(forKey: "aiGhostDY") as? Double ?? -2
+        let x = (anchorKind == .char ? anchor.maxX : anchor.minX) + CGFloat(dx)
         let midY = primaryH - anchor.midY
-        let frame = NSRect(x: x + 1, y: (midY - size.height / 2).rounded(), width: size.width + 4, height: size.height)
+        let frame = NSRect(x: x.rounded(), y: (midY - size.height / 2 + CGFloat(dy)).rounded(), width: size.width + 4, height: size.height)
         panel.setFrame(frame, display: false)
         label.frame = NSRect(origin: .zero, size: frame.size)
         panel.display()
