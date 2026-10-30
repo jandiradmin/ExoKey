@@ -32,5 +32,8 @@ systemctl reload nginx
 
 # pull site updates from GitHub every 5 minutes
 CRON='*/5 * * * * git -C /var/www/exokey pull --ff-only -q >/dev/null 2>&1'
-( crontab -l 2>/dev/null | grep -v '/var/www/exokey' ; echo "$CRON" ) | crontab -
+{ crontab -l 2>/dev/null | grep -v '/var/www/exokey' || true; echo "$CRON"; } | crontab -
 echo OK; crontab -l | grep exokey
+
+# After DNS points exokey.top here:
+#   certbot --nginx -d exokey.top -d www.exokey.top --redirect -m admin@dredgers.com.ua --agree-tos -n
