@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ExoKey</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="ExoKey — безкоштовний перемикач розкладки для macOS з локальним ШІ: виправляє текст, набраний не тією мовою, помилки й підказує наступні слова. Англійська, українська, російська.">
+<meta property="og:title" content="ExoKey — розкладка, помилки й підказки ШІ для macOS">
+<meta property="og:description" content="Набрали ghbdsn — отримали «привіт». Безкоштовно, відкритий код, усе працює на вашому Mac.">
+<meta property="og:image" content="https://exokey.top/media/demo-en.gif">
+<meta property="og:url" content="https://exokey.top/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='4' width='28' height='24' rx='6' fill='%23ffb547'/%3E%3Crect x='6' y='7' width='20' height='15' rx='4' fill='%231a1306' opacity='.18'/%3E%3Ctext x='16' y='19.5' font-family='Arial' font-weight='700' font-size='11' text-anchor='middle' fill='%231a1306'%3EEx%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* Layout: a night keyboard — dark graphite, amber keycaps as the one accent; hero = the live demo; features as keycap tiles */
+:root {
+  --bg: #0e1013;
+  --bg-2: #14171c;
+  --card: #191d23;
+  --line: #2a2f38;
+  --fg: #eef0f3;
+  --muted: #98a0ae;
+  --accent: #ffb547;
+  --accent-ink: #1a1306;
+  --en: #337af2; --uk: #facc2e; --ru: #9454de;
+  --font-display: "Unbounded", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+html, body { background: var(--bg); color: var(--fg); margin: 0; }
+body { font: 400 17px/1.6 var(--font-body); -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+p { margin: 0; }
+button, .btn { font: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+
+/* nav */
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 20; background: var(--bg); }
+.nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; background: color-mix(in srgb, var(--bg) 86%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid transparent; }
+.nav.scrolled { border-bottom-color: var(--line); }
+.nav .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 64px; }
+.logo { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 700 20px/1 var(--font-display); letter-spacing: .01em; }
+.logo svg { width: 30px; height: 30px; }
+.nav-right { display: flex; align-items: center; gap: 10px; }
+.langs { display: inline-flex; background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+.langs button { border: 0; background: transparent; color: var(--muted); font: 600 12px/1 var(--font-body); letter-spacing: .06em; padding: 8px 11px; border-radius: 999px; cursor: pointer; }
+.langs button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.btn { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; border-radius: 12px; font-weight: 600; cursor: pointer; border: 0; }
+.btn-primary { background: var(--accent); color: var(--accent-ink); padding: 14px 22px; box-shadow: 0 4px 0 #b97a1c; transition: transform .12s, box-shadow .12s; }
+.btn-primary:hover { transform: translateY(1px); box-shadow: 0 3px 0 #b97a1c; }
+.btn-primary:active { transform: translateY(4px); box-shadow: 0 0 0 #b97a1c; }
+.btn-ghost { color: var(--fg); padding: 13px 18px; border: 1px solid var(--line); background: var(--card); }
+.btn-ghost:hover { border-color: #3c4250; }
+.nav .btn-primary { padding: 10px 16px; font-size: 14px; }
+@media (max-width: 560px) { .nav .btn-primary { display: none; } }
+
+/* hero */
+.hero { padding-block: 64px 40px; }
+.hero .wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 48px; align-items: center; }
+.eyebrow { font: 600 12px/1 var(--font-body); letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+.hero h1 { font: 700 clamp(34px, 5vw, 58px)/1.06 var(--font-display); letter-spacing: -.01em; margin-top: 16px; }
+.hero h1 .type { font-family: var(--font-mono); font-weight: 500; color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--accent) 70%, transparent); }
+.hero .lead { color: var(--muted); font-size: 19px; margin-top: 20px; max-width: 34em; }
+.cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 30px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 18px; color: var(--muted); font-size: 14px; }
+.meta span { display: inline-flex; align-items: center; gap: 7px; }
+.meta span::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.demo { border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: var(--bg-2); box-shadow: 0 30px 80px -30px rgb(0 0 0 / .7); }
+.demo img { display: block; width: 100%; height: auto; aspect-ratio: 760 / 660; }
+@media (max-width: 880px) { .hero .wrap { grid-template-columns: minmax(0, 1fr); } .hero { padding-block: 36px 24px; } }
+
+/* strip of examples */
+.strip { border-block: 1px solid var(--line); background: var(--bg-2); overflow: hidden; }
+.strip .row { display: flex; gap: 40px; padding-block: 18px; width: max-content; animation: slide 40s linear infinite; font: 500 16px/1 var(--font-mono); color: var(--muted); }
+.strip .row span b { color: var(--fg); font-weight: 500; }
+.strip .row span i { font-style: normal; color: var(--accent); padding-inline: 8px; }
+@keyframes slide { to { transform: translateX(-50%); } }
+
+/* sections */
+section { padding-block: 84px; }
+.section-head { max-width: 46em; margin-bottom: 40px; }
+.section-head h2 { font: 700 clamp(26px, 3.6vw, 40px)/1.12 var(--font-display); margin-top: 12px; }
+.section-head p { color: var(--muted); margin-top: 14px; font-size: 18px; }
+
+/* features: keycaps */
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 900px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.cap { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px; display: grid; gap: 12px; align-content: start; box-shadow: 0 4px 0 #0a0b0d; min-width: 0; }
+.cap h3 { font: 600 19px/1.25 var(--font-body); }
+.cap p { color: var(--muted); font-size: 15.5px; }
+.cap .ex { font: 500 14.5px/1.4 var(--font-mono); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; overflow-x: auto; white-space: nowrap; }
+.cap .ex .from { color: var(--muted); }
+.cap .ex .arr { color: var(--accent); padding-inline: 6px; }
+.cap .ex .gh { color: #697182; }
+.k { display: inline-block; font: 700 12px/1 var(--font-mono); padding: 5px 7px; border-radius: 6px; background: #262b34; border: 1px solid #353b46; box-shadow: 0 2px 0 #0a0b0d; color: var(--fg); }
+.chip { display: inline-block; font: 700 11px/1 var(--font-mono); padding: 4px 6px; border-radius: 5px; }
+.chip.en { background: var(--en); color: #fff; } .chip.uk { background: var(--uk); color: #111; } .chip.ru { background: var(--ru); color: #fff; }
+
+/* privacy */
+.privacy { background: var(--bg-2); border-block: 1px solid var(--line); }
+.privacy .wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: start; }
+@media (max-width: 860px) { .privacy .wrap { grid-template-columns: minmax(0, 1fr); } }
+.checks { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.checks li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; align-items: start; }
+.checks li svg { width: 22px; height: 22px; margin-top: 3px; color: var(--accent); }
+.checks b { display: block; font-weight: 600; }
+.checks span { color: var(--muted); font-size: 15.5px; }
+
+/* install steps */
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; counter-reset: s; }
+@media (max-width: 860px) { .steps { grid-template-columns: minmax(0, 1fr); } }
+.step { border: 1px solid var(--line); border-radius: 16px; padding: 22px; background: var(--card); counter-increment: s; min-width: 0; }
+.step::before { content: counter(s); display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font: 700 16px/1 var(--font-display); box-shadow: 0 3px 0 #b97a1c; }
+.step h3 { font: 600 18px/1.3 var(--font-body); margin-top: 14px; }
+.step p { color: var(--muted); font-size: 15.5px; margin-top: 8px; }
+
+/* hotkeys */
+.keys { width: 100%; border-collapse: collapse; font-size: 16px; }
+.keys td { padding: 13px 0; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.keys td:last-child { text-align: right; white-space: nowrap; }
+.keys-wrap { max-width: 720px; }
+
+/* faq */
+.faq { display: grid; gap: 10px; max-width: 820px; }
+.faq details { border: 1px solid var(--line); border-radius: 14px; background: var(--card); padding: 0 20px; }
+.faq summary { cursor: pointer; list-style: none; padding: 18px 0; font-weight: 600; display: flex; justify-content: space-between; gap: 16px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; color: var(--accent); font: 500 22px/1 var(--font-mono); }
+.faq details[open] summary::after { content: "−"; }
+.faq details p { color: var(--muted); padding-bottom: 18px; font-size: 16px; }
+
+/* final cta */
+.final { text-align: center; }
+.final h2 { font: 700 clamp(28px, 4vw, 46px)/1.1 var(--font-display); }
+.final p { color: var(--muted); margin: 16px auto 0; max-width: 36em; font-size: 18px; }
+.final .cta { justify-content: center; }
+
+footer { border-top: 1px solid var(--line); padding-block: 30px calc(30px + env(safe-area-inset-bottom, 0px)); color: var(--muted); font-size: 14px; }
+footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+footer a { color: var(--muted); text-decoration: none; }
+footer a:hover { color: var(--fg); }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .strip .row { animation: none; }
+  .btn-primary { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="nav" id="top">
+  <div class="wrap">
+    <a class="logo" href="#top" aria-label="ExoKey">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="4" width="28" height="24" rx="6" fill="#ffb547"/><rect x="5" y="6.5" width="22" height="16" rx="4" fill="#1a1306" opacity=".16"/><text x="16" y="19" font-family="Arial, sans-serif" font-weight="700" font-size="11" text-anchor="middle" fill="#1a1306">Ex</text></svg>
+      ExoKey
+    </a>
+    <div class="nav-right">
+      <div class="langs" role="group" aria-label="Language">
+        <button data-lang="uk" aria-pressed="true">UA</button>
+        <button data-lang="en" aria-pressed="false">EN</button>
+        <button data-lang="ru" aria-pressed="false">RU</button>
+      </div>
+      <a class="btn btn-primary" href="https://github.com/jandiradmin/ExoKey/releases/latest" data-i="nav_dl">Завантажити</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <div class="eyebrow" data-i="eyebrow">Для macOS · безкоштовно · відкритий код</div>
+        <h1><span class="type">ghbdsn</span><br><span data-i="h1">Пишіть, не дивлячись на розкладку</span></h1>
+        <p class="lead" data-i="lead">ExoKey сам виправляє текст, набраний не тією мовою, ловить помилки й підказує наступні слова. Англійська, українська, російська. Усе працює на вашому Mac.</p>
+        <div class="cta">
+          <a class="btn btn-primary" href="https://github.com/jandiradmin/ExoKey/releases/latest">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1Zm-7 15a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg>
+            <span data-i="cta_dl">Завантажити для Mac</span>
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/jandiradmin/ExoKey">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/></svg>
+            GitHub
+          </a>
+        </div>
+        <div class="meta"><span data-i="m1">macOS 13+, Apple Silicon</span><span data-i="m2">Без хмари</span><span data-i="m3">Ліцензія MIT</span></div>
+      </div>
+      <div class="demo"><img id="demo" src="media/demo-uk.gif" width="760" height="660" alt="Демонстрація ExoKey" data-i-alt="demo_alt"></div>
+    </div>
+  </section>
+
+  <div class="strip" aria-hidden="true">
+    <div class="row" id="strip"></div>
+  </div>
+
+  <section id="features">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="eyebrow" data-i="f_eyebrow">Можливості</div>
+        <h2 data-i="f_h2">Дев’ять дрібниць, які економлять хвилини щодня</h2>
+      </div>
+      <div class="grid" id="grid"></div>
+    </div>
+  </section>
+
+  <section class="privacy" id="privacy">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="eyebrow" data-i="p_eyebrow">Приватність</div>
+        <h2 data-i="p_h2">Ваш текст не залишає ваш Mac</h2>
+        <p data-i="p_lead">ExoKey бачить клавіші, щоб виправляти розкладку. Тому ми зробили так, щоб нікуди нічого не надсилалося.</p>
+      </div>
+      <ul class="checks" id="checks"></ul>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="eyebrow" data-i="i_eyebrow">Встановлення</div>
+        <h2 data-i="i_h2">Дві хвилини — і готово</h2>
+      </div>
+      <div class="steps" id="steps"></div>
+    </div>
+  </section>
+
+  <section id="keys" style="padding-top:0">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="eyebrow" data-i="k_eyebrow">Гарячі клавіші</div>
+        <h2 data-i="k_h2">Усе під пальцями</h2>
+      </div>
+      <div class="keys-wrap"><table class="keys"><tbody id="keyrows"></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="faq" style="padding-top:0">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="eyebrow">FAQ</div>
+        <h2 data-i="q_h2">Часті запитання</h2>
+      </div>
+      <div class="faq" id="faqlist"></div>
+    </div>
+  </section>
+
+  <section class="final">
+    <div class="wrap">
+      <h2 data-i="final_h2">Спробуйте ExoKey</h2>
+      <p data-i="final_p">Безкоштовно. Якщо ExoKey вам знадобився, поставте зірку на GitHub — це допомагає проєкту рости.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="https://github.com/jandiradmin/ExoKey/releases/latest" data-i="cta_dl2">Завантажити для Mac</a>
+        <a class="btn btn-ghost" href="https://github.com/jandiradmin/ExoKey" data-i="star">★ Зірка на GitHub</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 ExoKey · MIT</span>
+    <span><a href="https://github.com/jandiradmin/ExoKey">GitHub</a> · <a href="https://github.com/jandiradmin/ExoKey/releases" data-i="releases">Версії</a> · <a href="https://github.com/jandiradmin/ExoKey/issues" data-i="issues">Повідомити про помилку</a></span>
+  </div>
+</footer>
+
+<script>
+const T = {
+  uk: {
+    title: "ExoKey — розкладка, помилки й підказки ШІ для macOS",
+    nav_dl: "Завантажити", eyebrow: "Для macOS · безкоштовно · відкритий код",
+    h1: "Пишіть, не дивлячись на розкладку",
+    lead: "ExoKey сам виправляє текст, набраний не тією мовою, ловить помилки й підказує наступні слова. Англійська, українська, російська. Усе працює на вашому Mac.",
+    cta_dl: "Завантажити для Mac", cta_dl2: "Завантажити для Mac", m1: "macOS 13+, Apple Silicon", m2: "Без хмари", m3: "Ліцензія MIT",
+    demo_alt: "Демонстрація ExoKey: виправлення розкладки, помилок і підказки", demo: "media/demo-uk.gif",
+    f_eyebrow: "Можливості", f_h2: "Дев’ять дрібниць, які економлять хвилини щодня",
+    features: [
+      ["Виправлення розкладки", "З третьої літери ExoKey розуміє, що ви пишете не тією мовою, переписує слово й перемикає розкладку.", '<span class="from">ghbdsn</span><span class="arr">→</span>привіт'],
+      ["Помилки й описки", "Пропущена, зайва чи переставлена літера — під словом з’являється виправлення, Tab застосовує.", '<span class="from">хорактестики</span><span class="arr">→</span>характеристики'],
+      ["Підказки ШІ", "Локальна модель пропонує продовження сірим текстом просто в рядку й враховує листування у вікні.", 'Дякую за <span class="gh">швидку відповідь.</span> <span class="k">Tab</span>'],
+      ["Імена з великої літери", "Марина, Київ, Олег — у підказках імена й назви пишуться правильно.", '<span class="from">мар</span> <span class="k">Tab</span><span class="arr">→</span>Марині'],
+      ["Навчання", "Скасували виправлення двічі — слово більше не чіпається. Нові слова, імена й скорочення ExoKey запам’ятовує сам.", '<span class="k">⌃</span> <span class="k">⌥</span> <span class="k">Z</span>'],
+      ["Ваші фрази", "Звороти, які ви пишете постійно, з’являються після кількох літер.", '<span class="from">З пов</span><span class="gh">агою, команда</span>'],
+      ["Мова для програми", "Термінал завжди англійською, Telegram — українською. Перемикається разом із вікном.", 'Telegram <span class="chip uk">UK</span>  Термінал <span class="chip en">EN</span>'],
+      ["Ярлик біля курсора", "Кольоровий ярлик під курсором показує, якою мовою ви зараз пишете.", '<span class="chip en">EN</span> <span class="chip uk">UK</span> <span class="chip ru">RU</span>'],
+      ["Калькулятор у тексті", "Наберіть приклад і «=», ExoKey допише відповідь. Відсотки й дужки теж.", '200+10%=<span style="color:#57d18b">220</span>'],
+    ],
+    p_eyebrow: "Приватність", p_h2: "Ваш текст не залишає ваш Mac",
+    p_lead: "ExoKey бачить клавіші, щоб виправляти розкладку. Тому ми зробили так, щоб нікуди нічого не надсилалося.",
+    checks: [
+      ["Без інтернету", "Словники й модель ШІ працюють локально. Мережа потрібна лише раз — щоб завантажити модель."],
+      ["Паролі не чіпаються", "Захищені поля й поля з підписом «пароль», PIN чи код ExoKey пропускає повністю."],
+      ["Текст не зберігається", "Набране й текст вікон обробляються в пам’яті. Зберігаються лише слова, які ви додали або яких навчилася програма."],
+      ["Відкритий код", "Кожен рядок можна перевірити на GitHub. Ліцензія MIT."],
+    ],
+    i_eyebrow: "Встановлення", i_h2: "Дві хвилини — і готово",
+    steps: [
+      ["Завантажте", "Архів з останньою версією на GitHub. Розпакуйте й перенесіть ExoKey.app у «Програми»."],
+      ["Дозвольте запуск", "Під час першого запуску відкрийте Системні параметри → Приватність і безпека → «Усе одно відкрити»."],
+      ["Надайте доступ", "Увімкніть ExoKey у розділах «Доступність» і «Моніторинг введення». Значок з’явиться в рядку меню."],
+    ],
+    k_eyebrow: "Гарячі клавіші", k_h2: "Усе під пальцями",
+    keys: [["Скасувати виправлення", "⌃ ⌥ Z"], ["Перетворити останнє слово", "⌃ ⌥ X"], ["Виправити помилку в слові", "⌃ ⌥ C"], ["Прийняти слово / усю підказку", "Tab / ⇧ Tab"], ["Призупинити ExoKey", "⌃ ⌥ P"]],
+    q_h2: "Часті запитання",
+    faq: [
+      ["Це безкоштовно?", "Так. ExoKey безкоштовний і з відкритим кодом. Якщо він вам корисний, поставте зірку на GitHub."],
+      ["Які мови підтримуються?", "Англійська, українська й російська. Працюють будь-які встановлені розкладки цих мов: ABC, US, Українська, Російська — ПК та інші."],
+      ["Чому macOS попереджає під час першого запуску?", "Поки що ExoKey не нотаризований Apple. Це тимчасово: нотаризація з’явиться в наступних версіях."],
+      ["Чи потрібна модель ШІ?", "Ні. Виправлення розкладки й помилок працюють без неї. Модель для підказок (2,5 ГБ) завантажується за бажанням у Налаштуваннях."],
+      ["Чому не в App Store?", "Пісочниця App Store забороняє програмам бачити натискання клавіш, а без цього виправляти розкладку неможливо."],
+      ["Чи буде версія для Windows?", "Плануємо після стабільної версії для Mac."],
+    ],
+    final_h2: "Спробуйте ExoKey",
+    final_p: "Безкоштовно. Якщо ExoKey вам знадобився, поставте зірку на GitHub — це допомагає проєкту рости.",
+    star: "★ Зірка на GitHub", releases: "Версії", issues: "Повідомити про помилку",
+    strip: [["ghbdsn", "привіт"], ["руддщ", "hello"], ["хорактестики", "характеристики"], ["yf", "на"], ["db;e", "вижу"], ["teh", "the"], ["2+2=", "4"], ["мар", "Марині"], ["'nj", "это"], ["recieve", "receive"]],
+  },
+  en: {
+    title: "ExoKey — layout fix, typos and AI suggestions for macOS",
+    nav_dl: "Download", eyebrow: "For macOS · free · open source",
+    h1: "Type without looking at the layout",
+    lead: "ExoKey fixes text typed in the wrong keyboard layout, catches typos and suggests the next words. English, Ukrainian, Russian. Everything runs on your Mac.",
+    cta_dl: "Download for Mac", cta_dl2: "Download for Mac", m1: "macOS 13+, Apple Silicon", m2: "No cloud", m3: "MIT license",
+    demo_alt: "ExoKey demo: layout correction, typo fixes and suggestions", demo: "media/demo-en.gif",
+    f_eyebrow: "Features", f_h2: "Nine small things that save minutes every day",
+    features: [
+      ["Layout correction", "From the 3rd letter ExoKey notices you're typing in the wrong layout, rewrites the word and switches the layout.", '<span class="from">руддщ</span><span class="arr">→</span>hello'],
+      ["Typos", "A missing, extra or swapped letter: the fix appears under the word, and Tab applies it.", '<span class="from">recieve</span><span class="arr">→</span>receive'],
+      ["AI suggestions", "A local model suggests the continuation as gray text right in the line, and reads the conversation in the window.", 'Thanks for the <span class="gh">quick reply.</span> <span class="k">Tab</span>'],
+      ["Names capitalized", "Marina, Kyiv, John: names and places come out right in suggestions.", '<span class="from">mar</span> <span class="k">Tab</span><span class="arr">→</span>Marina'],
+      ["Learning", "Undo a correction twice and the word is left alone. New words, names and abbreviations are learned automatically.", '<span class="k">⌃</span> <span class="k">⌥</span> <span class="k">Z</span>'],
+      ["Your phrases", "Phrases you type all the time appear after a few letters.", '<span class="from">Best re</span><span class="gh">gards, the team</span>'],
+      ["Language per app", "Terminal always in English, Telegram in Ukrainian. The layout follows the window.", 'Telegram <span class="chip uk">UK</span>  Terminal <span class="chip en">EN</span>'],
+      ["Label at the cursor", "A small colored label under the cursor shows the language you're typing in.", '<span class="chip en">EN</span> <span class="chip uk">UK</span> <span class="chip ru">RU</span>'],
+      ["Calculator in text", "Type an expression and “=”, and ExoKey adds the answer. Percentages and parentheses too.", '200+10%=<span style="color:#57d18b">220</span>'],
+    ],
+    p_eyebrow: "Privacy", p_h2: "Your text never leaves your Mac",
+    p_lead: "ExoKey sees key presses so it can fix the layout. So we made sure nothing is ever sent anywhere.",
+    checks: [
+      ["Works offline", "Dictionaries and the AI model run locally. The network is needed once, to download the model."],
+      ["Passwords are skipped", "Protected fields and fields labeled password, PIN or code are left completely alone."],
+      ["Nothing is stored", "What you type and window text are processed in memory. Only words you add or that ExoKey learns are saved."],
+      ["Open source", "Every line is on GitHub. MIT license."],
+    ],
+    i_eyebrow: "Install", i_h2: "Ready in two minutes",
+    steps: [
+      ["Download", "Get the latest version from GitHub. Unzip it and move ExoKey.app to Applications."],
+      ["Allow it to open", "On first launch, go to System Settings → Privacy & Security and click “Open Anyway”."],
+      ["Grant access", "Turn on ExoKey in Accessibility and Input Monitoring. The icon appears in the menu bar."],
+    ],
+    k_eyebrow: "Hotkeys", k_h2: "Everything at your fingertips",
+    keys: [["Undo a correction", "⌃ ⌥ Z"], ["Convert the last word", "⌃ ⌥ X"], ["Fix a typo in the last word", "⌃ ⌥ C"], ["Accept a word / whole suggestion", "Tab / ⇧ Tab"], ["Pause ExoKey", "⌃ ⌥ P"]],
+    q_h2: "FAQ",
+    faq: [
+      ["Is it free?", "Yes. ExoKey is free and open source. If you find it useful, star it on GitHub."],
+      ["Which languages are supported?", "English, Ukrainian and Russian, with any installed layouts for them: ABC, US, Ukrainian, Russian – PC and others."],
+      ["Why does macOS warn me on first launch?", "ExoKey isn't notarized by Apple yet. Notarization is coming in a future version."],
+      ["Do I need the AI model?", "No. Layout and typo correction work without it. The suggestion model (2.5 GB) is an optional download in Settings."],
+      ["Why isn't it in the App Store?", "The App Store sandbox doesn't let apps see key presses, and without that layout correction is impossible."],
+      ["Will there be a Windows version?", "It's planned after a stable Mac release."],
+    ],
+    final_h2: "Try ExoKey",
+    final_p: "It's free. If ExoKey helps you, star it on GitHub — it helps the project grow.",
+    star: "★ Star on GitHub", releases: "Releases", issues: "Report a bug",
+    strip: [["руддщ", "hello"], ["ghbdtn", "привет"], ["teh", "the"], ["recieve", "receive"], ["tommorow", "tomorrow"], ["yf", "на"], ["2+2=", "4"], ["mar", "Marina"], ["хорактестики", "характеристики"]],
+  },
+  ru: {
+    title: "ExoKey — раскладка, опечатки и подсказки ИИ для macOS",
+    nav_dl: "Скачать", eyebrow: "Для macOS · бесплатно · открытый код",
+    h1: "Пишите, не глядя на раскладку",
+    lead: "ExoKey сам исправляет текст, набранный не на том языке, ловит опечатки и подсказывает следующие слова. Английский, украинский, русский. Всё работает на вашем Mac.",
+    cta_dl: "Скачать для Mac", cta_dl2: "Скачать для Mac", m1: "macOS 13+, Apple Silicon", m2: "Без облака", m3: "Лицензия MIT",
+    demo_alt: "Демонстрация ExoKey: исправление раскладки, опечаток и подсказки", demo: "media/demo-en.gif",
+    f_eyebrow: "Возможности", f_h2: "Девять мелочей, которые экономят минуты каждый день",
+    features: [
+      ["Исправление раскладки", "С третьей буквы ExoKey понимает, что вы пишете не на том языке, переписывает слово и переключает раскладку.", '<span class="from">ghbdtn</span><span class="arr">→</span>привет'],
+      ["Опечатки", "Пропущенная, лишняя или переставленная буква — под словом появляется исправление, Tab применяет.", '<span class="from">хорактестики</span><span class="arr">→</span>характеристики'],
+      ["Подсказки ИИ", "Локальная модель предлагает продолжение серым текстом прямо в строке и учитывает переписку в окне.", 'Спасибо за <span class="gh">быстрый ответ.</span> <span class="k">Tab</span>'],
+      ["Имена с заглавной", "Марина, Киев, Олег — в подсказках имена и названия пишутся правильно.", '<span class="from">мар</span> <span class="k">Tab</span><span class="arr">→</span>Марине'],
+      ["Обучение", "Отменили исправление дважды — слово больше не трогается. Новые слова, имена и сокращения ExoKey запоминает сам.", '<span class="k">⌃</span> <span class="k">⌥</span> <span class="k">Z</span>'],
+      ["Ваши фразы", "Обороты, которые вы пишете постоянно, появляются после нескольких букв.", '<span class="from">С уваж</span><span class="gh">ением, команда</span>'],
+      ["Язык для программы", "Терминал всегда на английском, Telegram — на украинском. Раскладка переключается вместе с окном.", 'Telegram <span class="chip uk">UK</span>  Терминал <span class="chip en">EN</span>'],
+      ["Ярлык у курсора", "Цветной ярлык под курсором показывает, на каком языке вы сейчас пишете.", '<span class="chip en">EN</span> <span class="chip uk">UK</span> <span class="chip ru">RU</span>'],
+      ["Калькулятор в тексте", "Наберите пример и «=», ExoKey допишет ответ. Проценты и скобки тоже.", '200+10%=<span style="color:#57d18b">220</span>'],
+    ],
+    p_eyebrow: "Приватность", p_h2: "Ваш текст не покидает ваш Mac",
+    p_lead: "ExoKey видит клавиши, чтобы исправлять раскладку. Поэтому мы сделали так, чтобы никуда ничего не отправлялось.",
+    checks: [
+      ["Без интернета", "Словари и модель ИИ работают локально. Сеть нужна только один раз — чтобы скачать модель."],
+      ["Пароли не трогаются", "Защищённые поля и поля с подписью «пароль», PIN или код ExoKey полностью пропускает."],
+      ["Текст не сохраняется", "Набранное и текст окон обрабатываются в памяти. Сохраняются только слова, которые вы добавили или которым научилась программа."],
+      ["Открытый код", "Каждую строку можно проверить на GitHub. Лицензия MIT."],
+    ],
+    i_eyebrow: "Установка", i_h2: "Две минуты — и готово",
+    steps: [
+      ["Скачайте", "Архив с последней версией на GitHub. Распакуйте и перенесите ExoKey.app в «Программы»."],
+      ["Разрешите запуск", "При первом запуске откройте Системные настройки → Конфиденциальность и безопасность → «Всё равно открыть»."],
+      ["Дайте доступ", "Включите ExoKey в разделах «Универсальный доступ» и «Мониторинг ввода». Значок появится в строке меню."],
+    ],
+    k_eyebrow: "Горячие клавиши", k_h2: "Всё под пальцами",
+    keys: [["Отменить исправление", "⌃ ⌥ Z"], ["Перевести последнее слово", "⌃ ⌥ X"], ["Исправить опечатку в слове", "⌃ ⌥ C"], ["Принять слово / всю подсказку", "Tab / ⇧ Tab"], ["Приостановить ExoKey", "⌃ ⌥ P"]],
+    q_h2: "Частые вопросы",
+    faq: [
+      ["Это бесплатно?", "Да. ExoKey бесплатный и с открытым кодом. Если он вам полезен, поставьте звезду на GitHub."],
+      ["Какие языки поддерживаются?", "Английский, украинский и русский. Работают любые установленные раскладки этих языков: ABC, US, Украинская, Русская — ПК и другие."],
+      ["Почему macOS предупреждает при первом запуске?", "Пока ExoKey не нотаризован Apple. Это временно: нотаризация появится в следующих версиях."],
+      ["Нужна ли модель ИИ?", "Нет. Исправление раскладки и опечаток работают без неё. Модель для подсказок (2,5 ГБ) скачивается по желанию в Настройках."],
+      ["Почему не в App Store?", "Песочница App Store запрещает программам видеть нажатия клавиш, а без этого исправлять раскладку невозможно."],
+      ["Будет ли версия для Windows?", "Планируем после стабильной версии для Mac."],
+    ],
+    final_h2: "Попробуйте ExoKey",
+    final_p: "Бесплатно. Если ExoKey вам пригодился, поставьте звезду на GitHub — это помогает проекту расти.",
+    star: "★ Звезда на GitHub", releases: "Версии", issues: "Сообщить об ошибке",
+    strip: [["ghbdtn", "привет"], ["руддщ", "hello"], ["хорактестики", "характеристики"], ["yf", "на"], ["db;e", "вижу"], ["кнечно", "конечно"], ["2+2=", "4"], ["мар", "Марине"], ["'nj", "это"], ["teh", "the"]],
+  },
+};
+
+const check = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4.2 4.2L19 7"/></svg>';
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function apply(lang) {
+  const L = T[lang];
+  document.documentElement.lang = lang;
+  document.title = L.title;
+  document.querySelectorAll("[data-i]").forEach(el => { const v = L[el.dataset.i]; if (v != null) el.textContent = v; });
+  const img = document.getElementById("demo");
+  if (!img.src.endsWith(L.demo)) img.src = L.demo;
+  img.alt = L.demo_alt;
+  document.querySelectorAll(".langs button").forEach(b => b.setAttribute("aria-pressed", b.dataset.lang === lang));
+  document.getElementById("grid").innerHTML = L.features.map(([h, p, ex]) =>
+    `<article class="cap"><h3>${esc(h)}</h3><p>${esc(p)}</p><div class="ex">${ex}</div></article>`).join("");
+  document.getElementById("checks").innerHTML = L.checks.map(([b, s]) => `<li>${check}<div><b>${esc(b)}</b><span>${esc(s)}</span></div></li>`).join("");
+  document.getElementById("steps").innerHTML = L.steps.map(([h, p]) => `<div class="step"><h3>${esc(h)}</h3><p>${esc(p)}</p></div>`).join("");
+  document.getElementById("keyrows").innerHTML = L.keys.map(([a, k]) =>
+    `<tr><td>${esc(a)}</td><td>${k.split(" / ").map(g => g.split(" ").map(x => `<span class="k">${esc(x)}</span>`).join(" ")).join(" / ")}</td></tr>`).join("");
+  document.getElementById("faqlist").innerHTML = L.faq.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("");
+  const items = L.strip.map(([a, b]) => `<span>${esc(a)}<i>→</i><b>${esc(b)}</b></span>`).join("");
+  document.getElementById("strip").innerHTML = items + items;
+}
+
+function pick() {
+  const h = (location.hash || "").slice(1);
+  if (T[h]) return h;
+  try { const s = localStorage.getItem("exokey-lang"); if (T[s]) return s; } catch (e) {}
+  const n = (navigator.language || "en").slice(0, 2);
+  return n === "uk" ? "uk" : n === "ru" ? "ru" : "en";
+}
+
+document.querySelectorAll(".langs button").forEach(b => b.addEventListener("click", () => {
+  const l = b.dataset.lang;
+  try { localStorage.setItem("exokey-lang", l); } catch (e) {}
+  apply(l);
+}));
+const nav = document.querySelector(".nav");
+addEventListener("scroll", () => nav.classList.toggle("scrolled", scrollY > 8), { passive: true });
+apply(pick());
+</script>
+</body>
+</html>
