@@ -174,6 +174,11 @@ final class UserStore: ObservableObject {
         return n
     }
 
+    func clearStats() {
+        exec("DELETE FROM ngrams WHERE key LIKE 'stat:%'")
+        ngramCache = nil
+    }
+
     func count(_ key: String) -> Int {
         if ngramCache == nil { loadNgrams() }
         return ngramCache?[key] ?? 0

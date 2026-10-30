@@ -108,7 +108,8 @@ final class Engine {
         let code = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags
         if recordingHotkey { return .pass }
-        if SpellFix.shared.keyDown(code: code, flags: flags) { reset(); return .swallow }
+        let spellChar = layouts.current?.char(KeyStroke(code: code, shift: flags.contains(.maskShift), caps: flags.contains(.maskAlphaShift)))
+        if SpellFix.shared.keyDown(code: code, flags: flags, char: spellChar) { reset(); return .swallow }
         if !flags.intersection([.maskControl, .maskAlternate, .maskCommand]).isEmpty {
             Log.write("combo code=\(code) mods=\(flags.intersection(Hotkey.relevant).rawValue) convert=\(settings.hkConvert.keyCode)/\(settings.hkConvert.mods)")
         }
@@ -487,6 +488,7 @@ final class Engine {
         let t = toL.text(keys)
         Injector.type(capitalize ? NameCase.capitalize(t) : t)
         correctionKeys = keys
+        if !manual { Stats.add(.layoutFixed) }
         let originalFrom = correction?.from ?? from
         correction = Correction(from: originalFrom, to: target, manual: manual)
         screenLang = target
@@ -524,6 +526,7 @@ final class Engine {
     }
 
     private func recordUndo(_ c: Correction, original: String) {
+        if !c.manual { Stats.add(.layoutUndone) }
         guard settings.learning, !c.manual, !original.isEmpty else { return }
         let e = store.touch(.rule, c.from, original, undos: 1, targetLang: c.to)
         if e.undos >= settings.undosToException {

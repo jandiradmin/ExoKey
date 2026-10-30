@@ -37,6 +37,25 @@ enum CaretLocator {
         return nil
     }
 
+    /// Frame of the focused input field (fallback when the caret can't be located).
+    static func fieldRect() -> CGRect? {
+        let sys = AXUIElementCreateSystemWide()
+        AXUIElementSetMessagingTimeout(sys, 0.15)
+        var f: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(sys, kAXFocusedUIElementAttribute as CFString, &f) == .success,
+              let v = f, CFGetTypeID(v) == AXUIElementGetTypeID() else { return nil }
+        let e = v as! AXUIElement
+        var pos: CFTypeRef?, size: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(e, kAXPositionAttribute as CFString, &pos) == .success,
+              AXUIElementCopyAttributeValue(e, kAXSizeAttribute as CFString, &size) == .success,
+              let pv = pos, let sv = size else { return nil }
+        var p = CGPoint.zero, s = CGSize.zero
+        AXValueGetValue(pv as! AXValue, .cgPoint, &p)
+        AXValueGetValue(sv as! AXValue, .cgSize, &s)
+        guard s.width > 20, s.height > 8, s.height < 600 else { return nil }
+        return CGRect(origin: p, size: s)
+    }
+
     private static func previousChar(_ e: AXUIElement, _ loc: Int) -> String? {
         var r = CFRange(location: loc - 1, length: 1)
         guard let rv = AXValueCreate(.cfRange, &r) else { return nil }

@@ -9,6 +9,9 @@ final class SpellFix {
     // offer (plaque) state
     private(set) var offer: (orig: String, fix: String, boundary: String)?
     private var generation = 0
+    /// Letters typed after the finished word (the next word in progress); nil = tracking stopped
+    private var typedAfter: String?
+    private var autoHide: DispatchWorkItem?
     // last applied fix, for ⌃⌥Z
     private var applied: (orig: String, fix: String, boundary: String)?
     private var keysSinceApply = 0
@@ -88,30 +91,45 @@ final class SpellFix {
         guard mode > 0 else { return }
         if indexes.isEmpty { warmUp(); return }
         generation += 1
+        typedAfter = ""
         let gen = generation
         queue.async {
             guard let fix = self.correction(typed, lang, auto: mode == 2) else { return }
             DispatchQueue.main.async {
                 guard gen == self.generation else { return }        // user typed further
+                guard let after = self.typedAfter else { return }
                 if mode == 2 {
+                    guard after.isEmpty else { return }          // the user already typed on: don't touch
                     self.replace(orig: typed, fix: fix, boundary: boundary)
+                    Stats.add(.spellAccepted)
                     Log.write("spell: auto")
                 } else {
                     self.offer = (typed, fix, boundary)
-                    self.showPanel(fix)
-                    Log.write("spell: offered")
+                    let placed = self.showPanel(fix)
+                    Stats.add(.spellShown)
+                    Log.write("spell: offered (\(placed)) app=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")")
                 }
             }
         }
     }
 
-    /// Any key pressed: cancels pending work; returns true if the key was used (Tab / Esc on the plaque).
-    func keyDown(code: UInt16, flags: CGEventFlags) -> Bool {
+    /// Every key. Letters of the next word keep the plaque; Tab accepts, Esc hides, anything else ends it.
+    /// Returns true if the key was used.
+    func keyDown(code: UInt16, flags: CGEventFlags, char: String?) -> Bool {
         keysSinceApply += 1
-        if isOffering {
-            let plain = flags.intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift]).isEmpty
-            if code == 48 && plain { accept(); return true }
-            if code == 53 && plain { dismiss(); return true }
+        let plain = flags.intersection([.maskCommand, .maskControl, .maskAlternate]).isEmpty
+        if isOffering && plain && !flags.contains(.maskShift) {
+            if code == 48 { accept(); return true }
+            if code == 53 { dismiss(); return true }
+        }
+        if typedAfter != nil, plain, let c = char, c.count == 1, let ch = c.first,
+           ch.isLetter || ch == "'" || ch == "-" {
+            typedAfter! += c                                   // typing the next word: keep the offer
+            return false
+        }
+        if typedAfter != nil, plain, code == 51, let t = typedAfter, !t.isEmpty {
+            typedAfter!.removeLast()
+            return false
         }
         generation += 1
         dismiss()
@@ -120,13 +138,21 @@ final class SpellFix {
 
     func dismiss() {
         offer = nil
+        typedAfter = nil
+        autoHide?.cancel()
         panel.orderOut(nil)
     }
 
     private func accept() {
         guard let o = offer else { return }
+        let after = typedAfter ?? ""
         dismiss()
-        replace(orig: o.orig, fix: o.fix, boundary: o.boundary)
+        // erase "<typo><boundary><next word so far>", type it back fixed
+        Injector.backspaces(o.orig.count + o.boundary.count + after.count)
+        Injector.type(o.fix + o.boundary + after)
+        applied = (o.orig, o.fix, o.boundary)
+        keysSinceApply = 0
+        Stats.add(.spellAccepted)
         Log.write("spell: accepted")
     }
 
@@ -147,6 +173,7 @@ final class SpellFix {
             let w = TextNorm.normalize(a.orig, lang)
             _ = UserStore.shared.touch(.word, lang, w, uses: 1)
         }
+        Stats.add(.spellUndone)
         Log.write("spell: undone")
         return true
     }
@@ -165,22 +192,33 @@ final class SpellFix {
 
     // MARK: plaque
 
-    private func showPanel(_ fix: String) {
+    @discardableResult
+    private func showPanel(_ fix: String) -> String {
         label.stringValue = "\(fix)  ⇥"
         let size = label.fittingSize
         let w = size.width + 16, h = size.height + 8
         let primaryH = NSScreen.screens.first?.frame.height ?? 0
         let origin: NSPoint
+        var placed = "caret"
         if let r = CaretLocator.caretRect() {
             origin = NSPoint(x: r.minX - 4, y: primaryH - r.maxY - h - 4)
+        } else if let f = CaretLocator.fieldRect() {
+            origin = NSPoint(x: f.minX + 8, y: primaryH - f.maxY - h - 4)   // under the input field
+            placed = "field"
         } else {
             let m = NSEvent.mouseLocation
             origin = NSPoint(x: m.x + 12, y: m.y - h - 14)
+            placed = "mouse"
         }
         panel.setFrame(NSRect(origin: origin, size: NSSize(width: w, height: h)), display: false)
         bg.frame = NSRect(x: 0, y: 0, width: w, height: h)
         label.frame = NSRect(x: 8, y: 4, width: size.width, height: size.height)
         panel.display()
         panel.orderFrontRegardless()
+        autoHide?.cancel()
+        let hideItem = DispatchWorkItem { [weak self] in self?.dismiss() }
+        autoHide = hideItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8, execute: hideItem)
+        return placed
     }
 }

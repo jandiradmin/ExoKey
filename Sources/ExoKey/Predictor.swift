@@ -88,6 +88,8 @@ final class Predictor {
         }
         guard available else { hide(); return }
         if isVisible, let t = typed, t.count == 1, suggestion.hasPrefix(t) {
+            // typed a whole suggested word by hand (space after letters) — the guess was right
+            if t == " ", let l = consumed.last, l.isLetter { Stats.add(.aiHitWords) }
             suggestion.removeFirst()               // user types what we suggested — keep the rest
             consumed += t
             if suggestion.trimmingCharacters(in: .whitespaces).isEmpty { hide(); schedule(); return }
@@ -136,6 +138,8 @@ final class Predictor {
         }
         Injector.lastWasAccept = true
         StyleMemory.shared.lastShown?.accepted = true
+        Stats.add(.aiAccepted)
+        Stats.add(.aiHitWords, max(1, part.split(whereSeparator: { $0 == " " }).count))
         if !namePartial.isEmpty {
             // "мар" + "ина" → "Марина"
             let onScreen = namePartial + consumed.prefix { $0.isLetter || $0 == "-" || $0 == "'" }
@@ -387,6 +391,7 @@ final class Predictor {
     }
 
     private func present(_ s: String, _ ctx: Ctx, _ lang: Lang) {
+        if !isVisible { Stats.add(.aiShown) }
         if Settings.shared.aiLearnStyle {
             let app = NSWorkspace.shared.frontmostApplication
             StyleMemory.shared.lastShown = StyleMemory.Shown(

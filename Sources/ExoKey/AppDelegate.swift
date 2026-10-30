@@ -175,6 +175,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             parent.submenu = sub
             menu.addItem(parent)
         }
+        menu.addItem(statsMenuItem())
         menu.addItem(item(L.t("menu.dictionary"), #selector(openDictionary)))
         menu.addItem(item(L.t("menu.settings"), #selector(openSettings)))
         let au = item(L.t("menu.autostart"), #selector(toggleAutostart))
@@ -191,6 +192,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         i.target = self
         return i
     }
+
+    private func statsMenuItem() -> NSMenuItem {
+        let sub = NSMenu()
+        func line(_ s: String) { let i = NSMenuItem(title: s, action: nil, keyEquivalent: ""); i.isEnabled = false; sub.addItem(i) }
+        let shown = Stats.get(.aiShown), hit = Stats.get(.aiHitWords), acc = Stats.get(.aiAccepted)
+        line(L.t("stats.ai", "\(shown)") + " · " + L.t("stats.aiHit", "\(hit)") + " · " + L.t("stats.accepted", "\(acc) (\(Stats.pct(acc, shown)))"))
+        let ss = Stats.get(.spellShown), sa = Stats.get(.spellAccepted), su = Stats.get(.spellUndone)
+        line(L.t("stats.spell", "\(ss)") + " · " + L.t("stats.accepted", "\(sa) (\(Stats.pct(sa, max(ss, sa))))") + " · " + L.t("stats.undone", "\(su)"))
+        let lf = Stats.get(.layoutFixed), lu = Stats.get(.layoutUndone)
+        line(L.t("stats.layout", "\(lf)") + " · " + L.t("stats.undone", "\(lu) (\(Stats.pct(lu, lf)))"))
+        if let d = Stats.since {
+            let f = DateFormatter(); f.dateStyle = .medium
+            line(L.t("stats.since", f.string(from: d)))
+        }
+        sub.addItem(.separator())
+        let r = NSMenuItem(title: L.t("stats.reset"), action: #selector(resetStats), keyEquivalent: "")
+        r.target = self
+        sub.addItem(r)
+        let parent = NSMenuItem(title: L.t("stats.title"), action: nil, keyEquivalent: "")
+        parent.submenu = sub
+        return parent
+    }
+
+    @objc private func resetStats() { Stats.reset() }
 
     @objc private func toggleAppLock(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
