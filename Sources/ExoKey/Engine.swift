@@ -76,9 +76,11 @@ final class Engine {
     // MARK: - Reset
 
     private var pendingSentenceEnd = false
+    private var sentenceStart = true
     private func code(_ k: KeyStroke) -> UInt16 { k.code }
 
     func reset() {
+        sentenceStart = true
         calcBuf = ""
         sentence = []
         resetWord()
@@ -271,17 +273,27 @@ final class Engine {
         if let ch = cur.char(ks), ".!?\r\n".contains(ch) || code(ks) == 36 { pendingSentenceEnd = true }
         if !disabled, let target = decideFinal() {
             let boundaryChar = cur.char(ks) ?? ""
-            apply(to: target, typedSoFarExcludingLast: false, manual: false)
+            apply(to: target, typedSoFarExcludingLast: false, manual: false, capitalize: shouldCapitalize(target))
             Log.write("final fix len=\(keys.count) -> \(target.rawValue)")
             switch kind {
             case .space, .control: Injector.repost(event)
             case .symbol: Injector.type(boundaryChar)
             }
             result = .swallow
+        } else if shouldCapitalize(screen), let l = layouts.layouts[screen] {
+            let t = l.text(keys)
+            Injector.backspaces(t.count)
+            Injector.type(NameCase.capitalize(t))
+            switch kind {
+            case .space, .control: Injector.repost(event)
+            case .symbol: Injector.type(cur.char(ks) ?? "")
+            }
+            result = .swallow
         } else {
             learnUnknown(screen)
         }
         finishWord(endedWithSpace: kind == .space)
+        sentenceStart = pendingSentenceEnd
         if pendingSentenceEnd { sentence = []; pendingSentenceEnd = false }
         return result
     }
@@ -312,7 +324,26 @@ final class Engine {
         return !t.isEmpty && prefixScore(t, o) == 0
     }
 
+    /// Should this all-lowercase word be written as a name ("марина" → "Марина")?
+    private func shouldCapitalize(_ lang: Lang) -> Bool {
+        guard settings.fixNameCase, !disabled, keys.count >= 2, let l = layouts.layouts[lang] else { return false }
+        if keys.contains(where: { $0.shift != $0.caps }) { return false }
+        let w = core(keys, lang)
+        guard w.count == l.text(keys).count else { return false }   // letters only
+        return NameCase.shared.isName(w, lang)
+    }
+
     private func finishWord(endedWithSpace: Bool) {
+        // learn how the user writes names (only mid-sentence, where a capital letter means a name)
+        if settings.learning, !sentenceStart, let lang = screenLang, keys.count >= 3, !disabled || correction != nil,
+           let l = layouts.layouts[lang] {
+            let w = core(keys, lang)
+            let ups = keys.map { $0.shift != $0.caps }
+            if w.count == l.text(keys).count {
+                if ups.first == true && !ups.dropFirst().contains(true) { NameCase.shared.learn(lower: w, capitalized: true, lang) }
+                else if !ups.contains(true) { NameCase.shared.learn(lower: w, capitalized: false, lang) }
+            }
+        }
         if let lang = screenLang, !disabled || correction != nil {
             learnPhrase(word: core(keys, lang), lang: lang, sentenceEnd: false)
         }
@@ -439,13 +470,14 @@ final class Engine {
 
     // MARK: - Applying
 
-    private func apply(to target: Lang, typedSoFarExcludingLast: Bool, manual: Bool) {
+    private func apply(to target: Lang, typedSoFarExcludingLast: Bool, manual: Bool, capitalize: Bool = false) {
         guard let from = screenLang, let fromL = layouts.layouts[from], let toL = layouts.layouts[target] else { return }
         let onScreen = typedSoFarExcludingLast ? Array(keys.dropLast()) : keys
         let eraseCount = fromL.text(onScreen).count
         layouts.select(target)
         Injector.backspaces(eraseCount)
-        Injector.type(toL.text(keys))
+        let t = toL.text(keys)
+        Injector.type(capitalize ? NameCase.capitalize(t) : t)
         correctionKeys = keys
         let originalFrom = correction?.from ?? from
         correction = Correction(from: originalFrom, to: target, manual: manual)

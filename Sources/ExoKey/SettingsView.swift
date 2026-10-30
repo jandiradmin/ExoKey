@@ -219,6 +219,13 @@ struct SettingsView: View {
                 LabeledContent(L.t("hk.pause")) { HotkeyField(hotkey: $s.hkPause, rec: ui.recPause) }
             }
             Section(L.t("set.extras")) {
+                Picker(L.t("set.badge"), selection: $s.badgeMode) {
+                    Text(L.t("set.badge.0")).tag(0)
+                    Text(L.t("set.badge.1")).tag(1)
+                    Text(L.t("set.badge.2")).tag(2)
+                }
+                .pickerStyle(.segmented)
+                Toggle(L.t("set.fixNameCase"), isOn: $s.fixNameCase)
                 Toggle(L.t("set.skipAllCaps"), isOn: $s.skipAllCaps)
                 Toggle(L.t("set.calculator"), isOn: $s.calculator)
                 Toggle(L.t("set.learnNames"), isOn: $s.learnNames)

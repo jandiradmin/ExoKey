@@ -61,6 +61,7 @@ private func keyTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CG
                 if code == 36 || code == 76 { Predictor.shared.messageSent() }
                 if nav.contains(code) && code != 51 { Predictor.shared.hide(); return }
                 Predictor.shared.keyTyped(code: code, typed: code == 51 ? nil : typed)
+                LayoutBadge.shared.keyTyped()
             }
         } else {
             Predictor.shared.hide()

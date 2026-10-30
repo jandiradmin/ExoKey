@@ -10,7 +10,8 @@ final class Predictor {
     private var timer: Timer?
     private var generation = 0
     private var streamTask: Task<Void, Never>?
-    private var consumed = ""          // characters of the current suggestion the user already typed
+    private var consumed = ""
+    private var namePartial = ""       // lowercase start of a name typed by the user; capitalized on accept          // characters of the current suggestion the user already typed
     private(set) var suggestion = ""
     private var suggestionLang: Lang = .en
     private let panel: NSPanel
@@ -110,6 +111,7 @@ final class Predictor {
         streamTask?.cancel()
         streamTask = nil
         consumed = ""
+        namePartial = ""
         generation += 1
         suggestion = ""
         panel.orderOut(nil)
@@ -134,6 +136,13 @@ final class Predictor {
         }
         Injector.lastWasAccept = true
         StyleMemory.shared.lastShown?.accepted = true
+        if !namePartial.isEmpty {
+            // "мар" + "ина" → "Марина"
+            let onScreen = namePartial + consumed.prefix { $0.isLetter || $0 == "-" || $0 == "'" }
+            Injector.backspaces(onScreen.count)
+            Injector.type(NameCase.capitalize(onScreen))
+            namePartial = ""
+        }
         Injector.type(part)
         lastInsert = part
         lastInsertLang = suggestionLang
@@ -307,7 +316,7 @@ final class Predictor {
 
         // 1) saved phrases
         if s.aiPhrases, s.aiPersonalization, let p = phraseCompletion(text, lang) {
-            present(p, ctx, lang)
+            present(applyNames(p, partial: partial, lang: lang), ctx, lang)
             return
         }
         // 2) model
@@ -325,6 +334,7 @@ final class Predictor {
                 out = self.preferUserWord(out, partial: partial, lang: lang)
                 out = self.removeBanned(out, lang: lang)
                 if done, out.isEmpty, !partial.isEmpty { out = self.dictCompletion(partial, lang) }
+                out = self.applyNames(out, partial: partial, lang: lang)
                 guard !out.isEmpty, out.hasPrefix(self.consumed) else { return }
                 let rest = String(out.dropFirst(self.consumed.count))
                 guard !rest.isEmpty, rest != self.suggestion else { return }
@@ -335,7 +345,7 @@ final class Predictor {
         // 3) light mode: complete the current word from dictionaries
         if !partial.isEmpty {
             let out = removeBanned(dictCompletion(partial, lang), lang: lang)
-            if !out.isEmpty { present(out, ctx, lang) }
+            if !out.isEmpty { present(applyNames(out, partial: partial, lang: lang), ctx, lang) }
         }
     }
 
@@ -390,6 +400,23 @@ final class Predictor {
         anchorKind = ctx.kind
         layout()
         panel.orderFrontRegardless()
+    }
+
+    /// Names in the suggestion get a capital letter; a lowercase name being typed is fixed on accept.
+    private func applyNames(_ s: String, partial: String, lang: Lang) -> String {
+        guard !s.isEmpty else { return s }
+        let nc = NameCase.shared
+        var first = "", rest = Substring(s)
+        if !partial.isEmpty {
+            let frag = s.prefix { $0.isLetter || $0 == "'" || $0 == "’" || $0 == "-" }
+            first = String(frag)
+            rest = s.dropFirst(frag.count)
+            let full = partial + first
+            namePartial = (partial == partial.lowercased() && nc.isName(TextNorm.normalize(full, lang), lang)) ? partial : ""
+        } else {
+            namePartial = ""
+        }
+        return first + nc.fixWords(String(rest), lang)
     }
 
     static func currentWord(_ text: String) -> String {

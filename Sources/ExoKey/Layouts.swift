@@ -119,6 +119,7 @@ final class LayoutManager {
         let external = expectedID != currentID
         expectedID = nil
         onChange?(external)
+        NotificationCenter.default.post(name: .exoLayoutChanged, object: nil)
     }
 
     /// Language of the current layout, nil if it is not one of en/ru/uk (or not enabled in the system).

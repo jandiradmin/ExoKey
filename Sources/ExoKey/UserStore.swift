@@ -174,6 +174,11 @@ final class UserStore: ObservableObject {
         return n
     }
 
+    func count(_ key: String) -> Int {
+        if ngramCache == nil { loadNgrams() }
+        return ngramCache?[key] ?? 0
+    }
+
     private func loadNgrams() {
         var m: [String: Int] = [:]
         var st: OpaquePointer?

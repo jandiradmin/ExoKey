@@ -18,6 +18,7 @@ BIN="$(swift build -c release --arch arm64 --show-bin-path)/ExoKey"
 cp "$BIN" "$APP/Contents/MacOS/ExoKey"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp data/dict/*.exd "$APP/Contents/Resources/"
+cp data/dict/*.names "$APP/Contents/Resources/" 2>/dev/null || true
 [ -f Resources/AppIcon.icns ] && cp Resources/AppIcon.icns "$APP/Contents/Resources/"
 
 # Stable signing identity keeps macOS permissions between rebuilds (see scripts/make_dev_cert.sh)

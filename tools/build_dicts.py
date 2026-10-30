@@ -61,6 +61,7 @@ def varint(n):
 
 def build(lang):
     hun = set()
+    caps = set()     # forms that appear capitalized in Hunspell (proper names)
     p = os.path.join(RAW, HUN[lang] + '_forms.txt')
     if os.path.exists(p):
         with open(p, encoding='utf-8', errors='ignore') as f:
@@ -68,9 +69,16 @@ def build(lang):
                 t = line.split('/')[0].split('\t')[0].strip()
                 if '=' in t:
                     t = t.rsplit('=', 1)[1]
+                raw = t
                 t = norm(t, lang)
-                if ok(t, lang):
+                if not ok(t, lang):
+                    continue
+                if raw[:1].isupper() and raw[1:] == raw[1:].lower():
+                    caps.add(t)
+                else:
                     hun.add(t)
+    names = caps - hun          # only ever written with a capital letter
+    hun |= caps
     counts = {}
     with open(os.path.join(RAW, lang + '_full.txt'), encoding='utf-8', errors='ignore') as f:
         for line in f:
@@ -128,6 +136,9 @@ def build(lang):
         f.write(struct.pack('<%dI' % len(offsets), *offsets))
         f.write(struct.pack('<%dI' % len(cums), *cums))
         f.write(data)
+    with open(os.path.join(OUT, lang + '.names'), 'w', encoding='utf-8') as f:
+        f.write('\n'.join(sorted(n for n in names if n in freq)))
+    print(lang, 'names', len(names), end=' ')
     print(lang, 'words', len(words), 'hunspell', len(hun), 'freqlist', len(counts),
           'size MB', round(os.path.getsize(os.path.join(OUT, lang + '.exd')) / 1e6, 1))
 
