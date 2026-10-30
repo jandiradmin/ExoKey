@@ -11,6 +11,9 @@ ExoKey fixes text typed in the wrong keyboard layout on macOS (English, Russian,
 ## Features
 
 - **Layout correction:** `ghbdtn` becomes `привет` as you type, with the layout switched to match. ExoKey checks words from the 2nd or 3rd letter against dictionaries of ~4.8M word forms, and checks the whole word again when you finish it.
+- **Typo correction:** when a word isn't in the dictionary, ExoKey finds the closest one (a missing, extra, wrong or swapped letter): `хорактестиски` → `характеристики`, `teh` → `the`. The fix appears under the word and Tab applies it; ⌃⌥C fixes the last word on demand, and ⌃⌥Z brings yours back. Auto-replace is an option.
+- **Names:** suggestions capitalize names and places (`мар` + Tab → `Марина`). ExoKey also learns how you write them; capitalizing names while typing is an option.
+- **Layout label at the cursor:** a small colored label (EN blue, UK yellow, RU purple) appears under the cursor when the layout changes.
 - **Any layouts:** ABC, US, Russian, Russian – PC, Ukrainian and others. ExoKey reads the key mapping from macOS and stays idle in other layouts, such as German.
 - **Learning:**
   - Corrections you undo become exceptions.
@@ -37,6 +40,7 @@ All hotkeys can be changed in Settings.
 | Action | Default |
 |---|---|
 | Undo last correction | ⌃⌥Z |
+| Fix typo in last word | ⌃⌥C |
 | Convert last word to another layout | ⌃⌥X |
 | Pause / resume ExoKey | ⌃⌥P |
 | Accept next word of a suggestion | Tab |
@@ -93,6 +97,9 @@ ExoKey виправляє текст, набраний не в тій розкл
 ### Можливості
 
 - **Виправлення розкладки:** `ghbdsn` перетворюється на `привіт` прямо під час набору, і розкладка перемикається. ExoKey перевіряє слово з 2–3-ї літери за словниками на ~4,8 млн словоформ і ще раз, коли слово завершено.
+- **Виправлення помилок:** якщо слова немає в словнику, ExoKey шукає найближче (пропущена, зайва, хибна чи переставлена літера): `хорактестиски` → `характеристики`, `teh` → `the`. Підказка з’являється під словом, Tab застосовує; ⌃⌥C виправляє останнє слово на вимогу, ⌃⌥Z повертає ваш варіант. Автозаміна вмикається окремо.
+- **Імена:** у підказках імена й назви пишуться з великої літери (`мар` + Tab → `Марина`). ExoKey також запам’ятовує, як пишете їх ви; виправлення регістру під час набору вмикається окремо.
+- **Ярлик розкладки біля курсора:** невеликий кольоровий ярлик (EN синій, UK жовтий, RU фіолетовий) з’являється під курсором, коли змінюється розкладка.
 - **Будь-які розкладки:** ABC, US, російська, українська та інші. ExoKey бере відповідність клавіш із macOS і нічого не робить в інших розкладках, наприклад у німецькій.
 - **Навчання:**
   - Скасовані виправлення стають винятками.
@@ -119,6 +126,7 @@ ExoKey виправляє текст, набраний не в тій розкл
 | Дія | За замовчуванням |
 |---|---|
 | Скасувати останнє виправлення | ⌃⌥Z |
+| Виправити помилку в останньому слові | ⌃⌥C |
 | Перетворити останнє слово в іншу розкладку | ⌃⌥X |
 | Призупинити / увімкнути ExoKey | ⌃⌥P |
 | Прийняти наступне слово підказки | Tab |

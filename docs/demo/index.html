@@ -78,8 +78,14 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .doc { padding: 22px 22px 26px; font: 400 clamp(17px, 2.6vw, 24px)/1.55 var(--font-mono); min-height: 200px; }
 .line { white-space: pre-wrap; word-break: break-word; }
 .ghost { color: var(--ghost); }
-.caret { display: inline-block; width: 2px; height: 1.1em; vertical-align: -0.18em; background: var(--accent); margin-left: 1px; animation: blink 1s steps(1) infinite; }
+.caret { position: relative; display: inline-block; width: 2px; height: 1.1em; vertical-align: -0.18em; background: var(--accent); margin-left: 1px; animation: blink 1s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
+.cbadge { position: absolute; top: 1.3em; left: -3px; font: 700 10px/1 var(--font-mono); padding: 3px 4px; border-radius: 4px; animation: none; white-space: nowrap; }
+.cbadge.en { background: #337af2; color: #fff; } .cbadge.uk { background: #facc2e; color: #111; } .cbadge.ru { background: #9454de; color: #fff; }
+.cplaque { position: absolute; top: 1.45em; white-space: nowrap; font: 500 14px/1 var(--font-body); color: var(--fg);
+  background: #2a2f39; border: 1px solid #3a404c; border-radius: 7px; padding: 6px 9px; box-shadow: 0 6px 18px rgb(0 0 0 / .35); }
+.cplaque kbd { font: 600 12px/1 var(--font-mono); color: var(--muted); margin-left: 6px; }
+.caret:has(.cbadge), .caret:has(.cplaque) { animation: none; }
 .hl { background: color-mix(in srgb, var(--accent) 28%, transparent); border-radius: 4px; transition: background .6s; }
 .res { color: var(--ok); font-weight: 500; }
 
@@ -115,7 +121,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .caption p { margin: 0; color: var(--muted); font-size: 16px; line-height: 1.5; max-width: 65ch; }
 
 /* scene nav */
-.nav { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .nav button {
   text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
   padding: 10px 10px 12px; color: var(--muted); cursor: pointer; font: 500 13px/1.25 var(--font-body);
@@ -124,7 +130,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .nav button .bar2 { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--accent); }
 .nav button[aria-current="true"] { color: var(--fg); border-color: #3b4250; }
 @media (max-width: 640px) {
-  .nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .menubar .left .menuitems { display: none; }
   .screen { padding: 16px 16px 66px; min-height: 360px; }
   .keys { right: 16px; bottom: 14px; }
@@ -183,11 +189,15 @@ const T = {
     menu: "Файл  Редагування  Формат  Вікно",
     scenes: [
       { nav: "Розкладка", eyebrow: "Виправлення розкладки", title: "Набрали не тією мовою — ExoKey виправить сам",
-        text: "З третьої літери ExoKey перевіряє слово за словниками, переписує набране й перемикає розкладку. Англійська, українська, російська." },
+        text: "З третьої літери ExoKey перевіряє слово за словниками, переписує набране й перемикає розкладку. Кольоровий ярлик біля курсора показує мову." },
+      { nav: "Помилки", eyebrow: "Виправлення помилок", title: "Помилка в слові? Tab — і виправлено",
+        text: "Якщо слова немає в словнику, ExoKey шукає найближче: пропущена, зайва чи переставлена літера. Підказка під словом, Tab замінює, ⌃⌥Z повертає." },
       { nav: "Навчання", eyebrow: "Навчання", title: "Скасували двічі — більше не чіпає",
         text: "⌃⌥Z повертає набране. Після двох скасувань слово стає винятком. Нові слова, імена й скорочення ExoKey запам’ятовує сам." },
       { nav: "Автодоповнення ШІ", eyebrow: "Автодоповнення ШІ", title: "Підказує, що ви хочете написати",
         text: "Сірий текст одразу після курсора. Tab — наступне слово, ⇧Tab — уся підказка. Модель працює на вашому Mac, текст нікуди не надсилається." },
+      { nav: "Імена", eyebrow: "Імена", title: "Марина, а не марина",
+        text: "ExoKey знає імена й назви і в підказках пише їх з великої літери. Як саме пишете ви, він теж запам’ятовує." },
       { nav: "Фрази", eyebrow: "Фрази", title: "Ваші фрази — за кілька літер",
         text: "Збережені фрази підставляються, щойно ви почали їх набирати. Прийняті підказки ExoKey теж запам’ятовує." },
       { nav: "Програми", eyebrow: "Розкладка для програм", title: "Кожній програмі — своя мова",
@@ -201,6 +211,8 @@ const T = {
     s4: { typed: "З пов", rest: "агою, команда ExoKey", saved: "Збережена фраза" },
     s5: { apps: [["Telegram", "UK"], ["Термінал", "EN"], ["Нотатки", "UK"]], text: "Мова перемикається разом із програмою" },
     s6: [["2+2=", "4"], ["1250*12=", "15000"], ["200+10%=", "220"]],
+    sp: [["Технічні ", "хорактестики", "характеристики"], ["", "дякуюю", "дякую"]],
+    nm: { a: "Передай ", typed: "мар", rest: "ині", fixed: "Марині", then: " привіт", note: "Імена — з великої літери" },
     notes: "Нотатки", pause: "Пауза", play: "Відтворити",
   },
   en: {
@@ -208,11 +220,15 @@ const T = {
     menu: "File  Edit  Format  Window",
     scenes: [
       { nav: "Layout fix", eyebrow: "Layout correction", title: "Typed in the wrong layout? ExoKey fixes it",
-        text: "From the 3rd letter ExoKey checks the word against dictionaries, rewrites it and switches the layout. English, Ukrainian, Russian." },
+        text: "From the 3rd letter ExoKey checks the word against dictionaries, rewrites it and switches the layout. A colored label at the cursor shows the language." },
+      { nav: "Typos", eyebrow: "Typo correction", title: "A typo? Press Tab and it's fixed",
+        text: "When a word isn't in the dictionary, ExoKey finds the closest one: a missing, extra or swapped letter. The fix appears under the word; Tab replaces it, ⌃⌥Z brings yours back." },
       { nav: "Learning", eyebrow: "Learning", title: "Undo it twice and it stays as typed",
         text: "⌃⌥Z brings back what you typed. After two undos the word becomes an exception. New words, names and abbreviations are learned automatically." },
       { nav: "AI autocomplete", eyebrow: "AI autocomplete", title: "Suggests what you mean to write",
         text: "Gray text right after the cursor. Tab takes the next word, ⇧Tab the whole suggestion. The model runs on your Mac; nothing leaves it." },
+      { nav: "Names", eyebrow: "Names", title: "Marina, not marina",
+        text: "ExoKey knows names and places and capitalizes them in suggestions. It also learns how you write them." },
       { nav: "Phrases", eyebrow: "Phrases", title: "Your phrases in a few letters",
         text: "Saved phrases appear as soon as you start typing them. Suggestions you accept are remembered too." },
       { nav: "Per-app", eyebrow: "Per-app layouts", title: "Each app gets its own language",
@@ -226,6 +242,8 @@ const T = {
     s4: { typed: "Best re", rest: "gards, the ExoKey team", saved: "Saved phrase" },
     s5: { apps: [["Telegram", "UK"], ["Terminal", "EN"], ["Notes", "EN"]], text: "The layout follows the app" },
     s6: [["2+2=", "4"], ["1250*12=", "15000"], ["200+10%=", "220"]],
+    sp: [["Please ", "recieve", "receive"], ["the ", "tommorow", "tomorrow"]],
+    nm: { a: "Say hi to ", typed: "mar", rest: "ina", fixed: "Marina", then: " for me", note: "Names get a capital letter" },
     notes: "Notes", pause: "Pause", play: "Play",
   },
 };
@@ -235,7 +253,7 @@ const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 let lang = "uk";
 try { const s = localStorage.getItem("exokey-demo-lang"); if (s === "en" || s === "uk") lang = s; } catch (e) {}
 let scene = 0, run = 0, playing = true;
-const SCENE_COUNT = 6;
+const SCENE_COUNT = 8;
 
 class Stop extends Error {}
 function sleep(ms, token) {
@@ -244,6 +262,14 @@ function sleep(ms, token) {
 
 /* document model: lines of segments {t, cls} + caret on last line */
 let lines = [[]];
+let caretBadge = "", caretPlaque = null, cbTimer;
+let _cw = 0;
+function charW() { // width of one monospace character in the document
+  if (_cw) return _cw;
+  const m = document.createElement("span"); m.textContent = "0000000000"; m.style.visibility = "hidden";
+  $("doc").appendChild(m); _cw = m.getBoundingClientRect().width / 10; m.remove(); return _cw;
+}
+addEventListener("resize", () => { _cw = 0; });
 function render(ghost = "") {
   const doc = $("doc");
   doc.innerHTML = "";
@@ -253,6 +279,8 @@ function render(ghost = "") {
     segs.forEach(s => { const sp = document.createElement("span"); if (s.cls) sp.className = s.cls; sp.textContent = s.t; div.appendChild(sp); });
     if (i === lines.length - 1) {
       const c = document.createElement("span"); c.className = "caret"; div.appendChild(c);
+      if (caretBadge) { const b = document.createElement("span"); b.className = "cbadge " + caretBadge.toLowerCase(); b.textContent = caretBadge; c.appendChild(b); }
+      if (caretPlaque) { const p = document.createElement("span"); p.className = "cplaque"; p.style.left = `${-Math.round(caretPlaque.back * charW()) - 10}px`; p.textContent = caretPlaque.text; const k = document.createElement("kbd"); k.textContent = "⇥"; p.appendChild(k); c.appendChild(p); }
       if (ghost) { const g = document.createElement("span"); g.className = "ghost"; g.textContent = ghost; div.appendChild(g); }
     }
     doc.appendChild(div);
@@ -267,7 +295,10 @@ function replaceLast(n, str, cls) { // replace last n chars on current line
   const l = cur(); let all = l.map(s => s.t).join(""); all = all.slice(0, all.length - n);
   lines[lines.length - 1] = all ? [{ t: all }] : []; push(str, cls); render();
 }
-function badge(code) { const b = $("badge"); b.textContent = code; b.classList.add("flash"); setTimeout(() => b.classList.remove("flash"), 450); }
+function badge(code) {
+  const b = $("badge"); b.textContent = code; b.classList.add("flash"); setTimeout(() => b.classList.remove("flash"), 450);
+  caretBadge = code; render(); clearTimeout(cbTimer); cbTimer = setTimeout(() => { caretBadge = ""; render(); }, 1300);
+}
 let keyTimer;
 function key(label) {
   const k = $("keys"); k.innerHTML = ""; clearTimeout(keyTimer);
@@ -275,7 +306,7 @@ function key(label) {
   keyTimer = setTimeout(() => { k.innerHTML = ""; }, 1100);
 }
 function toast(html) { $("toastbox").innerHTML = `<div class="toast">${html}</div>`; }
-function clearOverlays() { $("keys").innerHTML = ""; $("toastbox").innerHTML = ""; $("extra").innerHTML = ""; }
+function clearOverlays() { caretBadge = ""; caretPlaque = null; clearTimeout(cbTimer); $("keys").innerHTML = ""; $("toastbox").innerHTML = ""; $("extra").innerHTML = ""; }
 
 /* scenes */
 const scenes = [
@@ -295,6 +326,24 @@ const scenes = [
       newline(); render();
     }
     await sleep(1400, tok);
+  },
+  async tok => { // typos
+    const L = T[lang].sp;
+    badge(lang === "uk" ? "UK" : "EN"); await sleep(600, tok);
+    for (const [pre, typo, fix] of L) {
+      await type(pre, tok, 90);
+      await type(typo, tok, 110);
+      await type(" ", tok, 100);
+      await sleep(350, tok);
+      caretPlaque = { text: fix, back: typo.length + 1 }; render();
+      await sleep(1300, tok);
+      key("Tab"); await sleep(250, tok);
+      caretPlaque = null;
+      replaceLast(typo.length + 1, fix, "hl"); push(" ");
+      render(); await sleep(700, tok);
+      lines[lines.length - 1].forEach(s => s.cls = ""); render();
+    }
+    await sleep(1600, tok);
   },
   async tok => { // learning
     const L = T[lang].s2;
@@ -330,6 +379,23 @@ const scenes = [
     key("⇧ Tab"); await sleep(250, tok);
     push(L.bg.slice(first.length)); render();
     await sleep(2200, tok);
+  },
+  async tok => { // names
+    const L = T[lang].nm;
+    badge(lang === "uk" ? "UK" : "EN");
+    await type(L.a, tok, 90);
+    await type(L.typed, tok, 140);
+    await sleep(300, tok);
+    render(L.rest); await sleep(1100, tok);
+    key("Tab"); await sleep(250, tok);
+    replaceLast(L.typed.length, L.fixed, "hl");
+    toast(`✓ <b>${L.fixed}</b> · ${L.note}`);
+    await sleep(800, tok);
+    lines[lines.length - 1].forEach(s => s.cls = "");
+    render(L.then); await sleep(900, tok);
+    key("⇧ Tab"); await sleep(250, tok);
+    push(L.then); render();
+    await sleep(2000, tok);
   },
   async tok => { // phrases
     const L = T[lang].s4;

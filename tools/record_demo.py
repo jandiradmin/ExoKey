@@ -8,7 +8,7 @@ from playwright.sync_api import sync_playwright
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 lang = sys.argv[1] if len(sys.argv) > 1 else "en"
 out = ROOT / "docs" / "media" / f"demo-{lang}.gif"
-SECONDS, FPS, WIDTH = float(sys.argv[2]) if len(sys.argv) > 2 else 64, 8, 760
+SECONDS, FPS, WIDTH = float(sys.argv[2]) if len(sys.argv) > 2 else 110, 8, 760
 
 with sync_playwright() as p:
     b = p.chromium.launch(channel="chrome")
@@ -26,7 +26,8 @@ with sync_playwright() as p:
     while time.time() - start < SECONDS:
         t0 = time.time()
         cur = page.evaluate("[...document.querySelectorAll('#nav button')].findIndex(b => b.getAttribute('aria-current') === 'true')")
-        if cur == 5: seen_last = True
+        last = page.evaluate("document.querySelectorAll('#nav button').length - 1")
+        if cur == last: seen_last = True
         if seen_last and cur == 0: break          # one full cycle recorded
 
         png = page.screenshot(clip=clip)
