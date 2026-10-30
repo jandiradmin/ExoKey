@@ -12,7 +12,7 @@ Format EXD2 (little-endian):
   data: block = word0(varint len, bytes, varint freq) + rest(u8 shared, varint sufLen, bytes, varint freq)
 Words: normalized, lowercase, sorted by UTF-8 bytes. Frequency: parts per billion (min 1).
 """
-import os, struct, sys
+import os, re, struct, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAW = os.path.join(ROOT, 'data', 'raw')
@@ -26,6 +26,9 @@ ALPHA = {
 }
 HUN = {'en': 'en_US', 'ru': 'ru_RU', 'uk': 'uk_UA'}
 MINCOUNT = {'en': 5, 'ru': 3, 'uk': 2}   # for words absent from hunspell
+REPEAT3 = re.compile(r'(.)\1\1')
+REPEAT4 = re.compile(r'(.)\1\1\1')
+COLLAPSE = re.compile(r'(.)\1+')
 APOS = str.maketrans({'\u2019': "'", '\u02bc': "'", '`': "'", '\u00b4': "'"})
 
 
@@ -83,11 +86,17 @@ def build(lang):
                 continue
             if c < MINCOUNT[lang] and w not in hun:
                 continue
+            # subtitle noise: "дааа", "нееет", "mmm", "chffffff" (3+ same letters in a row)
+            if w not in hun and REPEAT3.search(w):
+                continue
             counts[w] = counts.get(w, 0) + c
     total = sum(counts.values()) or 1
     freq = {w: max(1, round(c * 1e9 / total)) for w, c in counts.items()}
     for w in hun:
         freq.setdefault(w, 1)
+    # interjections even in Hunspell: "ааа", "бррр", "дуууже", "www" (4+ same letters, or 3+ in a short word)
+    for w in [w for w in freq if REPEAT4.search(w) or (REPEAT3.search(w) and len(COLLAPSE.sub(r'\1', w)) <= 4)]:
+        del freq[w]
     words = sorted(freq, key=lambda s: s.encode('utf-8'))
 
     data = bytearray()
