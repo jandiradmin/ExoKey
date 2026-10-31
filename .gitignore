@@ -8,3 +8,4 @@ data/dict/
 build.log
 data/brew.log
 tools/.venv/
+data/dict/short_*.txt

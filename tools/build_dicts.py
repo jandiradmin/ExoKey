@@ -29,6 +29,12 @@ MINCOUNT = {'en': 5, 'ru': 3, 'uk': 2}   # for words absent from hunspell
 REPEAT3 = re.compile(r'(.)\1\1')
 REPEAT4 = re.compile(r'(.)\1\1\1')
 COLLAPSE = re.compile(r'(.)\1+')
+# short words (2-3 letters) are the main source of false layout matches ("гг", "дл", "кл"):
+# keep only Hunspell words with a vowel and at least SHORT_MIN ppb, plus tools/dict_rules/<lang>.keep;
+# tools/dict_rules/<lang>.ban removes words of any length.
+RULES = os.path.join(ROOT, 'tools', 'dict_rules')
+VOWELS = {'en': set('aeiouy'), 'ru': set('аеиоуыэюя'), 'uk': set('аеєиіїоуюя')}
+SHORT_MIN = 1000
 APOS = str.maketrans({'\u2019': "'", '\u02bc': "'", '`': "'", '\u00b4': "'"})
 
 
@@ -45,6 +51,14 @@ def ok(w, lang):
     if w[0] in "'-" or w[-1] in "'-" or '--' in w or "''" in w:
         return False
     return all(c in ALPHA[lang] for c in w)
+
+
+def rule_list(lang, kind):
+    p = os.path.join(RULES, lang + '.' + kind)
+    if not os.path.exists(p):
+        return set()
+    with open(p, encoding='utf-8') as f:
+        return {norm(l.split('#')[0], lang) for l in f if l.split('#')[0].strip()}
 
 
 def varint(n):
@@ -105,6 +119,18 @@ def build(lang):
     # interjections even in Hunspell: "ааа", "бррр", "дуууже", "www" (4+ same letters, or 3+ in a short word)
     for w in [w for w in freq if REPEAT4.search(w) or (REPEAT3.search(w) and len(COLLAPSE.sub(r'\1', w)) <= 4)]:
         del freq[w]
+    ban, keep = rule_list(lang, 'ban'), rule_list(lang, 'keep')
+    dropped = 0
+    for w in list(freq):
+        if w in keep:
+            continue
+        short_bad = 2 <= len(w) <= 3 and (w not in hun or freq[w] < SHORT_MIN or not set(w) & VOWELS[lang])
+        if w in ban or short_bad:
+            del freq[w]
+            dropped += 1
+    for w in keep:
+        freq[w] = max(freq.get(w, 0), SHORT_MIN)
+    print(lang, 'rules: dropped', dropped, 'keep', len(keep), 'ban', len(ban), end=' | ')
     words = sorted(freq, key=lambda s: s.encode('utf-8'))
 
     data = bytearray()
