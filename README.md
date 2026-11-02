@@ -4,7 +4,7 @@
 
 ExoKey fixes text typed in the wrong keyboard layout on macOS (English, Russian, Ukrainian) and suggests the next words with a local AI model. Everything runs on your Mac; no text leaves your computer.
 
-**[⬇ Download the latest release](https://github.com/jandiradmin/ExoKey/releases/latest)** · macOS 13+ · Apple Silicon
+**[⬇ Download the latest release](https://github.com/jandiradmin/ExoKey/releases/latest)** · **[🌐 exokey.top](https://exokey.top)** · macOS 13+ · Apple Silicon
 
 ![ExoKey demo: layout fix, learning, AI autocomplete, phrases, per-app layouts, calculator](docs/media/demo-en.gif)
 
@@ -52,7 +52,9 @@ All hotkeys can be changed in Settings.
 ## Install
 
 1. Download `ExoKey-x.y.z.zip` from [Releases](https://github.com/jandiradmin/ExoKey/releases), unzip it and move `ExoKey.app` to **Applications**.
-2. Preview builds are not notarized yet. On first launch, go to **System Settings → Privacy & Security** and click **Open Anyway**.
+2. Preview builds are not notarized yet. If macOS says **“ExoKey.app” Not Opened**, click **Done** (not “Move to Trash”), then go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway**. Or run `xattr -dr com.apple.quarantine /Applications/ExoKey.app` in Terminal.
+
+   ![How to allow ExoKey to open](docs/media/install-en.png)
 3. Allow ExoKey in **Accessibility** and **Input Monitoring**.
 4. ExoKey lives in the menu bar (`EN` / `RU` / `UK`). Settings and the dictionary editor are in its menu. Launching ExoKey again also opens Settings.
 
@@ -90,7 +92,7 @@ If ExoKey is useful to you, a donation or a ⭐ is appreciated.
 
 ExoKey виправляє текст, набраний не в тій розкладці на macOS (англійська, російська, українська), і підказує наступні слова за допомогою локальної моделі ШІ. Усе працює на вашому Mac, текст нікуди не надсилається.
 
-**[⬇ Завантажити останню версію](https://github.com/jandiradmin/ExoKey/releases/latest)** · macOS 13+ · Apple Silicon
+**[⬇ Завантажити останню версію](https://github.com/jandiradmin/ExoKey/releases/latest)** · **[🌐 exokey.top](https://exokey.top)** · macOS 13+ · Apple Silicon
 
 ![Демо ExoKey: розкладка, навчання, автодоповнення ШІ, фрази, розкладка для програм, калькулятор](docs/media/demo-uk.gif)
 
@@ -138,7 +140,9 @@ ExoKey виправляє текст, набраний не в тій розкл
 ### Встановлення
 
 1. Завантажте `ExoKey-x.y.z.zip` з [Releases](https://github.com/jandiradmin/ExoKey/releases), розпакуйте й перенесіть `ExoKey.app` до **Програм**.
-2. Попередні версії ще не нотаризовані. Під час першого запуску відкрийте **Системні параметри → Приватність і безпека** і натисніть **Усе одно відкрити**.
+2. Попередні версії ще не нотаризовані. Якщо macOS пише **«ExoKey.app» Not Opened**, натисніть **Done** (не «Move to Trash»), потім відкрийте **Системні параметри → Приватність і безпека**, прокрутіть униз і натисніть **Усе одно відкрити** (Open Anyway). Або виконайте в Терміналі `xattr -dr com.apple.quarantine /Applications/ExoKey.app`.
+
+   ![Як дозволити запуск ExoKey](docs/media/install-uk.png)
 3. Дозвольте ExoKey доступ у розділах **Доступність** і **Моніторинг введення**.
 4. ExoKey живе в рядку меню (`EN` / `RU` / `UK`). Налаштування й словник відкриваються з його меню, а також при повторному запуску програми.
 

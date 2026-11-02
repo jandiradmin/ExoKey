@@ -126,6 +126,7 @@ section { padding-block: 84px; }
 .checks span { color: var(--muted); font-size: 15.5px; }
 
 /* install steps */
+.gk { display: block; width: 100%; height: auto; margin-top: 20px; border-radius: 14px; border: 1px solid rgba(255,255,255,.08); }
 .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; counter-reset: s; }
 @media (max-width: 860px) { .steps { grid-template-columns: minmax(0, 1fr); } }
 .step { border: 1px solid var(--line); border-radius: 16px; padding: 22px; background: var(--card); counter-increment: s; min-width: 0; }
@@ -240,6 +241,7 @@ footer a:hover { color: var(--fg); }
         <h2 data-i="i_h2">Дві хвилини — і готово</h2>
       </div>
       <div class="steps" id="steps"></div>
+      <img id="gkimg" class="gk" src="media/install-uk.png" alt="" loading="lazy">
     </div>
   </section>
 
@@ -314,7 +316,7 @@ const T = {
     i_eyebrow: "Встановлення", i_h2: "Дві хвилини — і готово",
     steps: [
       ["Завантажте", "Архів з останньою версією на GitHub. Розпакуйте й перенесіть ExoKey.app у «Програми»."],
-      ["Дозвольте запуск", "Під час першого запуску відкрийте Системні параметри → Приватність і безпека → «Усе одно відкрити»."],
+      ["Дозвольте запуск", "Якщо macOS пише «Not Opened», натисніть Done, потім Системні параметри → Приватність і безпека → «Усе одно відкрити». Картинка нижче."],
       ["Надайте доступ", "Увімкніть ExoKey у розділах «Доступність» і «Моніторинг введення». Значок з’явиться в рядку меню."],
     ],
     k_eyebrow: "Гарячі клавіші", k_h2: "Усе під пальцями",
@@ -363,7 +365,7 @@ const T = {
     i_eyebrow: "Install", i_h2: "Ready in two minutes",
     steps: [
       ["Download", "Get the latest version from GitHub. Unzip it and move ExoKey.app to Applications."],
-      ["Allow it to open", "On first launch, go to System Settings → Privacy & Security and click “Open Anyway”."],
+      ["Allow it to open", "If macOS says “Not Opened”, click Done, then System Settings → Privacy & Security → “Open Anyway”. See the picture below."],
       ["Grant access", "Turn on ExoKey in Accessibility and Input Monitoring. The icon appears in the menu bar."],
     ],
     k_eyebrow: "Hotkeys", k_h2: "Everything at your fingertips",
@@ -412,7 +414,7 @@ const T = {
     i_eyebrow: "Установка", i_h2: "Две минуты — и готово",
     steps: [
       ["Скачайте", "Архив с последней версией на GitHub. Распакуйте и перенесите ExoKey.app в «Программы»."],
-      ["Разрешите запуск", "При первом запуске откройте Системные настройки → Конфиденциальность и безопасность → «Всё равно открыть»."],
+      ["Разрешите запуск", "Если macOS пишет «Not Opened», нажмите Done, затем Системные настройки → Конфиденциальность и безопасность → «Всё равно открыть». Картинка ниже."],
       ["Дайте доступ", "Включите ExoKey в разделах «Универсальный доступ» и «Мониторинг ввода». Значок появится в строке меню."],
     ],
     k_eyebrow: "Горячие клавиши", k_h2: "Всё под пальцами",
@@ -448,6 +450,9 @@ function apply(lang) {
   document.getElementById("grid").innerHTML = L.features.map(([h, p, ex]) =>
     `<article class="cap"><h3>${esc(h)}</h3><p>${esc(p)}</p><div class="ex">${ex}</div></article>`).join("");
   document.getElementById("checks").innerHTML = L.checks.map(([b, s]) => `<li>${check}<div><b>${esc(b)}</b><span>${esc(s)}</span></div></li>`).join("");
+  const gk = document.getElementById("gkimg");
+  gk.src = "media/install-" + lang + ".png";
+  gk.alt = L.steps[1][1];
   document.getElementById("steps").innerHTML = L.steps.map(([h, p]) => `<div class="step"><h3>${esc(h)}</h3><p>${esc(p)}</p></div>`).join("");
   document.getElementById("keyrows").innerHTML = L.keys.map(([a, k]) =>
     `<tr><td>${esc(a)}</td><td>${k.split(" / ").map(g => g.split(" ").map(x => `<span class="k">${esc(x)}</span>`).join(" ")).join(" / ")}</td></tr>`).join("");
