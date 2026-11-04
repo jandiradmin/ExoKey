@@ -272,6 +272,7 @@ footer a:hover { color: var(--fg); }
       <div class="cta">
         <a class="btn btn-primary" href="https://github.com/jandiradmin/ExoKey/releases/latest" data-dl="bottom" data-i="cta_dl2">Завантажити для Mac</a>
         <a class="btn btn-ghost" href="https://github.com/jandiradmin/ExoKey" data-i="star">★ Зірка на GitHub</a>
+        <a class="btn btn-ghost" href="https://paypal.me/YanHordashevskyy" data-dl="donate" data-i="donate">☕ Підтримати</a>
       </div>
     </div>
   </section>
@@ -291,7 +292,7 @@ const T = {
     nav_dl: "Завантажити", eyebrow: "Для macOS · безкоштовно · відкритий код",
     h1: "Пишіть, не дивлячись на розкладку",
     lead: "ExoKey сам виправляє текст, набраний не тією мовою, ловить помилки й підказує наступні слова. Англійська, українська, російська. Усе працює на вашому Mac.",
-    cta_dl: "Завантажити для Mac", cta_dl2: "Завантажити для Mac", m1: "macOS 13+, Apple Silicon", m2: "Без хмари", m3: "Ліцензія MIT",
+    cta_dl: "Завантажити для Mac", cta_dl2: "Завантажити для Mac", donate: "☕ Підтримати", m1: "macOS 13+, Apple Silicon", m2: "Без хмари", m3: "Ліцензія MIT",
     demo_alt: "Демонстрація ExoKey: виправлення розкладки, помилок і підказки", demo: "media/demo-uk.gif",
     f_eyebrow: "Можливості", f_h2: "Дев’ять дрібниць, які економлять хвилини щодня",
     features: [
@@ -340,7 +341,7 @@ const T = {
     nav_dl: "Download", eyebrow: "For macOS · free · open source",
     h1: "Type without looking at the layout",
     lead: "ExoKey fixes text typed in the wrong keyboard layout, catches typos and suggests the next words. English, Ukrainian, Russian. Everything runs on your Mac.",
-    cta_dl: "Download for Mac", cta_dl2: "Download for Mac", m1: "macOS 13+, Apple Silicon", m2: "No cloud", m3: "MIT license",
+    cta_dl: "Download for Mac", cta_dl2: "Download for Mac", donate: "☕ Support", m1: "macOS 13+, Apple Silicon", m2: "No cloud", m3: "MIT license",
     demo_alt: "ExoKey demo: layout correction, typo fixes and suggestions", demo: "media/demo-en.gif",
     f_eyebrow: "Features", f_h2: "Nine small things that save minutes every day",
     features: [
@@ -389,7 +390,7 @@ const T = {
     nav_dl: "Скачать", eyebrow: "Для macOS · бесплатно · открытый код",
     h1: "Пишите, не глядя на раскладку",
     lead: "ExoKey сам исправляет текст, набранный не на том языке, ловит опечатки и подсказывает следующие слова. Английский, украинский, русский. Всё работает на вашем Mac.",
-    cta_dl: "Скачать для Mac", cta_dl2: "Скачать для Mac", m1: "macOS 13+, Apple Silicon", m2: "Без облака", m3: "Лицензия MIT",
+    cta_dl: "Скачать для Mac", cta_dl2: "Скачать для Mac", donate: "☕ Поддержать", m1: "macOS 13+, Apple Silicon", m2: "Без облака", m3: "Лицензия MIT",
     demo_alt: "Демонстрация ExoKey: исправление раскладки, опечаток и подсказки", demo: "media/demo-en.gif",
     f_eyebrow: "Возможности", f_h2: "Девять мелочей, которые экономят минуты каждый день",
     features: [
@@ -479,7 +480,7 @@ addEventListener("scroll", () => nav.classList.toggle("scrolled", scrollY > 8), 
 apply(pick());
 // Google Analytics: "download_click" event — which button, in which site language
 document.querySelectorAll("[data-dl]").forEach(a => a.addEventListener("click", () => {
-  if (typeof gtag === "function") gtag("event", "download_click", {
+  if (typeof gtag === "function") gtag("event", a.dataset.dl === "donate" ? "donate_click" : "download_click", {
     button: a.dataset.dl, site_lang: document.documentElement.lang, transport_type: "beacon" });
 }));
 </script>

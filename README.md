@@ -58,6 +58,10 @@ All hotkeys can be changed in Settings.
 3. Allow ExoKey in **Accessibility** and **Input Monitoring**.
 4. ExoKey lives in the menu bar (`EN` / `RU` / `UK`). Settings and the dictionary editor are in its menu. Launching ExoKey again also opens Settings.
 
+## Support
+
+ExoKey is free and open source. If it saves you time, you can support development via [PayPal ☕](https://paypal.me/YanHordashevskyy).
+
 ## Privacy
 
 - Typed text is never stored or sent anywhere.
@@ -145,6 +149,10 @@ ExoKey виправляє текст, набраний не в тій розкл
    ![Як дозволити запуск ExoKey](docs/media/install-uk.png)
 3. Дозвольте ExoKey доступ у розділах **Доступність** і **Моніторинг введення**.
 4. ExoKey живе в рядку меню (`EN` / `RU` / `UK`). Налаштування й словник відкриваються з його меню, а також при повторному запуску програми.
+
+### Підтримка
+
+ExoKey безкоштовний і з відкритим кодом. Якщо він заощаджує вам час, можна підтримати розробку через [PayPal ☕](https://paypal.me/YanHordashevskyy).
 
 ### Приватність
 
