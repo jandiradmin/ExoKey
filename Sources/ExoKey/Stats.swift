@@ -6,6 +6,7 @@ enum Stats {
         case aiShown = "stat:ai_shown", aiHitWords = "stat:ai_hit", aiAccepted = "stat:ai_accept"
         case spellShown = "stat:spell_shown", spellAccepted = "stat:spell_ok", spellUndone = "stat:spell_undo"
         case layoutFixed = "stat:fix", layoutUndone = "stat:fix_undo"
+        case contactInserted = "stat:contact"
     }
     static func add(_ k: Key, _ n: Int = 1) {
         for _ in 0..<max(0, n) { UserStore.shared.bump(k.rawValue) }

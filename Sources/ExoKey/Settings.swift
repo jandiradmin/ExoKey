@@ -104,6 +104,10 @@ final class Settings: ObservableObject {
         set { d.set(newValue, forKey: "firstRunDone") }
     }
     @Published var calculator: Bool { didSet { d.set(calculator, forKey: "calculator") } }
+    @Published var contactsEnabled: Bool { didSet { d.set(contactsEnabled, forKey: "contactsEnabled") } }
+    @Published var aiTextbook: Bool { didSet { d.set(aiTextbook, forKey: "aiTextbook") } }
+    @Published var aiMyStyle: Bool { didSet { d.set(aiMyStyle, forKey: "aiMyStyle") } }
+    @Published var checkUpdates: Bool { didSet { d.set(checkUpdates, forKey: "checkUpdates"); if checkUpdates { Updater.shared.start() } } }
     @Published var learnNames: Bool { didSet { d.set(learnNames, forKey: "learnNames") } }
     @Published var implicitUndo: Bool { didSet { d.set(implicitUndo, forKey: "implicitUndo") } }
     /// bundle id -> layout language to switch to when the app becomes active
@@ -113,6 +117,7 @@ final class Settings: ObservableObject {
     @Published var hkUndo: Hotkey { didSet { save(hkUndo, "hkUndo") } }
     @Published var hkConvert: Hotkey { didSet { save(hkConvert, "hkConvert") } }
     @Published var hkPause: Hotkey { didSet { save(hkPause, "hkPause") } }
+    @Published var hkCase: Hotkey { didSet { save(hkCase, "hkCase") } }
 
     private init() {
         d.register(defaults: [
@@ -120,13 +125,13 @@ final class Settings: ObservableObject {
             "repeatCount": 3, "undosToException": 2, "notifications": true, "uiLang": UILang.system.rawValue,
             "excludedApps": ["com.apple.Terminal", "com.googlecode.iterm2", "com.apple.keychainaccess"],
             "activeLangs": ["en", "ru", "uk"],
-            "aiEnabled": false, "aiMode": AIMode.model.rawValue, "aiPhrases": true, "badgeMode": 1, "spellMode": 1, "fixNameCase": false, "aiLearnStyle": false, "aiVariant": AIVariant.fast.rawValue, "aiWindowContext": true, "aiMaxWords": 6, "aiDelay": 120, "aiConfidence": 1,
+            "aiEnabled": false, "aiMode": AIMode.model.rawValue, "aiPhrases": true, "badgeMode": 1, "spellMode": 1, "fixNameCase": false, "aiLearnStyle": false, "aiVariant": AIVariant.fast.rawValue, "aiWindowContext": true, "aiMaxWords": 10, "aiDelay": 120, "aiConfidence": 1,
             "aiLangs": ["en", "ru", "uk"], "aiPersonalization": true, "learnPhrases": false,
             "aiExcludedApps": ["com.apple.Terminal", "com.googlecode.iterm2", "com.microsoft.VSCode",
                                "com.todesktop.230313mzl4w4u92", "com.apple.dt.Xcode", "dev.zed.Zed", "dev.warp.Warp-Stable",
                                "com.mitchellh.ghostty", "net.kovidgoyal.kitty", "org.alacritty", "com.sublimetext.4",
                                "com.jetbrains.*", "com.apple.keychainaccess"], "skipAllCaps": true,
-            "calculator": true, "learnNames": true, "implicitUndo": true,
+            "calculator": true, "contactsEnabled": true, "checkUpdates": true, "aiTextbook": false, "aiMyStyle": false, "learnNames": true, "implicitUndo": true,
         ])
         enabled = d.bool(forKey: "enabled")
         activeLangs = Set((d.stringArray(forKey: "activeLangs") ?? []).compactMap(Lang.init(rawValue:)))
@@ -156,6 +161,10 @@ final class Settings: ObservableObject {
         aiPersonalization = d.bool(forKey: "aiPersonalization")
         learnPhrases = d.bool(forKey: "learnPhrases")
         calculator = d.bool(forKey: "calculator")
+        contactsEnabled = d.bool(forKey: "contactsEnabled")
+        checkUpdates = d.bool(forKey: "checkUpdates")
+        aiTextbook = d.bool(forKey: "aiTextbook")
+        aiMyStyle = d.bool(forKey: "aiMyStyle")
         learnNames = d.bool(forKey: "learnNames")
         implicitUndo = d.bool(forKey: "implicitUndo")
         appLayouts = d.dictionary(forKey: "appLayouts") as? [String: String] ?? [:]
@@ -164,6 +173,7 @@ final class Settings: ObservableObject {
         hkUndo = Self.load(d, "hkUndo") ?? Hotkey(keyCode: 6, mods: ctrlOpt)      // ⌃⌥Z
         hkConvert = Self.load(d, "hkConvert") ?? Hotkey(keyCode: 7, mods: ctrlOpt) // ⌃⌥X
         hkPause = Self.load(d, "hkPause") ?? Hotkey(keyCode: 35, mods: ctrlOpt)    // ⌃⌥P
+        hkCase = Self.load(d, "hkCase") ?? Hotkey(keyCode: 15, mods: ctrlOpt)      // ⌃⌥R
         hkSpell = Self.load(d, "hkSpell") ?? Hotkey(keyCode: 8, mods: ctrlOpt)   // ⌃⌥C
         hkAcceptWord = Self.load(d, "hkAcceptWord") ?? Hotkey(keyCode: 48, mods: 0) // Tab
         hkAcceptAll = Self.load(d, "hkAcceptAll") ?? Hotkey(keyCode: 48, mods: CGEventFlags.maskShift.rawValue) // ⇧Tab

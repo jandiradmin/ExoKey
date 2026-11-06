@@ -1,5 +1,6 @@
 import AppKit
 import Carbon
+import ApplicationServices
 
 /// Decides when the current word was typed in the wrong layout and fixes it.
 final class Engine {
@@ -27,6 +28,51 @@ final class Engine {
     private var keys: [KeyStroke] = []
     private var screenLang: Lang?
     private var disabled = false
+    /// The user fought a correction (switched layout by hand, erased the fixed word, undid it):
+    /// no automatic fixes until space / Return / Tab.
+    var holdUntilSpace = false
+    var typingWord: Bool { !keys.isEmpty }
+    /// After an accepted suggestion: we know exactly what is before the caret now.
+    private func afterInsert() {
+        if let c = Predictor.shared.lastInsertedChar, c == " " || c == "\n" { lastBoundary = c }
+    }
+
+    /// The last word-ending character the user typed (nil = unknown: after a click, arrows, backspace, insertion).
+    private var lastBoundary: Character?
+    /// Text was just inserted that ends inside a word (accepted suggestion / typo fix): the next letters continue it.
+    var continuesWord = false
+
+    /// Up to `n` characters before the caret (Accessibility; nil if the app doesn't tell).
+    static func textBeforeCaret(_ n: Int) -> String? {
+        let sys = AXUIElementCreateSystemWide()
+        AXUIElementSetMessagingTimeout(sys, 0.05)
+        var f: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(sys, kAXFocusedUIElementAttribute as CFString, &f) == .success,
+              let v = f, CFGetTypeID(v) == AXUIElementGetTypeID() else { return nil }
+        let e = v as! AXUIElement
+        var rr: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(e, kAXSelectedTextRangeAttribute as CFString, &rr) == .success,
+              let r = rr, CFGetTypeID(r) == AXValueGetTypeID() else { return nil }
+        var range = CFRange()
+        AXValueGetValue(r as! AXValue, .cfRange, &range)
+        guard range.length == 0, range.location > 0 else { return range.location == 0 ? "" : nil }
+        let len = min(n, range.location)
+        var part = CFRange(location: range.location - len, length: len)
+        guard let pr = AXValueCreate(.cfRange, &part) else { return nil }
+        var s: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(e, kAXStringForRangeParameterizedAttribute as CFString, pr, &s) == .success
+        else { return nil }
+        return s as? String
+    }
+
+    static func letterBeforeCaret() -> Bool { textBeforeCaret(1)?.last?.isLetter ?? false }
+
+    /// Inside an e-mail address or a link ("name@gmail", "https://site", "www.site"): never change the layout there.
+    static func inAddress(_ before: String) -> Bool {
+        let tail = before.split(whereSeparator: { $0.isWhitespace }).last.map(String.init) ?? ""
+        return tail.contains("@") || tail.contains("://") || tail.lowercased().hasPrefix("www.")
+    }
+    private var erasedSinceSpace = false
     private var corrections = 0
     private var visited: Set<Lang> = []
     private var correction: Correction?
@@ -39,6 +85,7 @@ final class Engine {
     private var convertCycle: [Lang] = []
 
     private var prevWordLang: Lang?
+    private var prevTyped: (word: String, lang: Lang)?
     private var keyCount = 0
     private var calcBuf = ""
     private var correctionKeys: [KeyStroke] = []
@@ -48,6 +95,10 @@ final class Engine {
         layouts.onChange = { [weak self] external in
             guard let self = self else { return }
             Predictor.shared.hide()
+            // switched by hand: the user knows which layout they want — no auto-fix until the next space
+            if external, self.correction != nil || self.last?.correction != nil || self.erasedSinceSpace {
+                self.holdUntilSpace = true
+            }
             if external, !self.keys.isEmpty {
                 // user switched layout by hand in the middle of a word — leave it alone
                 self.disabled = true
@@ -80,6 +131,10 @@ final class Engine {
     private func code(_ k: KeyStroke) -> UInt16 { k.code }
 
     func reset() {
+        lastBoundary = nil
+        contactAt = false
+        prevTyped = nil
+        ContactPicker.shared.close()
         sentenceStart = true
         calcBuf = ""
         sentence = []
@@ -104,10 +159,44 @@ final class Engine {
     private static let navKeys: Set<UInt16> = [53, 115, 116, 117, 119, 121, 123, 124, 125, 126, 114, 71]
     private static let boundaryKeys: Set<UInt16> = [49, 36, 76, 48] // space, return, enter, tab
 
+    /// "@" typed at the start of a word: the following word is a contact search (ContactPicker).
+    private var contactAt = false
+
     func keyDown(_ event: CGEvent) -> Result {
         let code = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags
         if recordingHotkey { return .pass }
+        let picker = ContactPicker.shared
+        if picker.handleKey(code: code, flags: flags) {
+            if !picker.isVisible { contactAt = false }
+            return .swallow
+        }
+        let plain = flags.intersection([.maskCommand, .maskControl, .maskAlternate]).isEmpty
+        let ks = KeyStroke(code: code, shift: flags.contains(.maskShift), caps: flags.contains(.maskAlphaShift))
+        let atStart = settings.contactsEnabled && settings.enabled && !excludedApp && plain && keys.isEmpty
+            && layouts.current?.char(ks) == "@"
+            && !(Self.textBeforeCaret(1)?.last.map { $0.isLetter || $0.isNumber || $0 == "." || $0 == "_" } ?? false)
+        if contactAt && code == 51 && keys.isEmpty { contactAt = false; picker.close() }   // erased the "@"
+        let r = keyDownCore(event)
+        if atStart {
+            contactAt = true
+            picker.ensureLoaded()
+        } else if contactAt {
+            if keys.isEmpty {
+                if code != 51 { contactAt = false }
+                picker.close()
+            } else {
+                var qs: [String] = []
+                for l in active { let t = l.text(keys); if !qs.contains(t) { qs.append(t) } }
+                picker.update(queries: qs, typed: keys.count)
+            }
+        }
+        return r
+    }
+
+    private func keyDownCore(_ event: CGEvent) -> Result {
+        let code = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
+        let flags = event.flags
         let spellChar = layouts.current?.char(KeyStroke(code: code, shift: flags.contains(.maskShift), caps: flags.contains(.maskAlphaShift)))
         if SpellFix.shared.keyDown(code: code, flags: flags, char: spellChar) { reset(); return .swallow }
         if !flags.intersection([.maskControl, .maskAlternate, .maskCommand]).isEmpty {
@@ -125,6 +214,15 @@ final class Engine {
             if settings.enabled { undo() }
             return .swallow
         }
+        // ⌘Z right after an automatic fix undoes the fix (what people press first)
+        if code == 6, flags.intersection(Hotkey.relevant) == .maskCommand, settings.enabled, canUndoAutoFix {
+            undo()
+            return .swallow
+        }
+        if settings.hkCase.matches(code: code, flags: flags) {
+            if settings.enabled { Selection.changeCase() }
+            return .swallow
+        }
         // Autocomplete keys (TZ §13.3)
         let pred = Predictor.shared
         if settings.hkToggleAI.matches(code: code, flags: flags) {
@@ -139,8 +237,8 @@ final class Engine {
             return .swallow
         }
         if pred.isVisible {
-            if settings.hkAcceptAll.matches(code: code, flags: flags) { pred.accept(all: true); reset(); return .swallow }
-            if settings.hkAcceptWord.matches(code: code, flags: flags) { pred.accept(all: false); reset(); return .swallow }
+            if settings.hkAcceptAll.matches(code: code, flags: flags) { pred.accept(all: true); reset(); afterInsert(); return .swallow }
+            if settings.hkAcceptWord.matches(code: code, flags: flags) { pred.accept(all: false); reset(); afterInsert(); return .swallow }
             if settings.hkHide.matches(code: code, flags: flags) { pred.dismiss(); return .swallow }
         }
         if settings.hkSpell.matches(code: code, flags: flags) {
@@ -157,7 +255,14 @@ final class Engine {
             Log.write("key #\(keyCount) enabled=\(settings.enabled) excluded=\(excludedApp) secure=\(IsSecureEventInputEnabled()) layout=\(layouts.currentID) lang=\(layouts.currentLang?.rawValue ?? "nil")")
         }
         guard settings.enabled, !excludedApp, !IsSecureEventInputEnabled() else { reset(); return .pass }
-        if !flags.intersection([.maskCommand, .maskControl, .maskAlternate]).isEmpty { reset(); return .pass }
+        if !flags.intersection([.maskCommand, .maskControl, .maskAlternate]).isEmpty {
+            // ⌥⌫ / ⌘⌫ right after a fix: the user erased our word — don't fix the retyped word again until a space
+            if code == 51, (correction.map { !$0.manual } ?? false) || (keys.isEmpty && (last?.correction.map { !$0.manual } ?? false)) {
+                holdUntilSpace = true
+                Log.write("word erased after a fix: hold until space")
+            }
+            reset(); return .pass
+        }
         if code == 51 { backspace(); return .pass }
         if Self.navKeys.contains(code) || code >= 96 && code <= 122 && KeyNames.special[code] != nil {
             reset(); return .pass
@@ -169,13 +274,9 @@ final class Engine {
         // Inline calculator
         if settings.calculator, let ch = cur.char(ks), ch.count == 1, let c = ch.first {
             if c == "=" {
-                if let r = Calculator.evaluate(calcBuf) {
-                    calcBuf = ""
-                    resetWord(); last = nil
-                    Injector.type("=" + r)
-                    Log.write("calc")
-                    return .swallow
-                }
+                // "=" goes to the app as usual; the result is added once the app has shown everything typed
+                // (at this point the last keys may still be on their way to the app)
+                scheduleCalc(typed: calcBuf, attempt: 0)
                 calcBuf = ""
             } else if Calculator.allowed.contains(c) {
                 calcBuf.append(c)
@@ -193,6 +294,29 @@ final class Engine {
             // first key of a word: skip password-like fields (checked once per field)
             if FieldGuard.focusedIsSensitive() { return .pass }
             screenLang = cur.lang; visited = [cur.lang]
+            // Continuing a word ExoKey didn't see from the start ("калькулятор" + "ом" after a suggestion, after
+            // backspace or a click): the piece alone looks like a word in another layout ("jv") — leave it as typed.
+            // The previous key typed a space / Return: a fresh word for sure — don't ask the app (Electron apps report
+            // the caret a few characters off, and a "letter before the caret" there disabled fixing real words).
+            // After "@", ".", "/", ":" — maybe an address; after a click, arrows, backspace or an inserted suggestion —
+            // maybe the middle of a word: then look at the text before the caret.
+            let fresh = lastBoundary.map { $0 == " " || $0 == "\n" || $0 == "\t" } ?? false
+            if continuesWord {
+                disabled = true
+            } else if !fresh {
+                let before = Self.textBeforeCaret(60)
+                let addressish = lastBoundary.map { "@./:".contains($0) } ?? true
+                // trust the app's caret only if the text before it ends with what was just typed
+                // (Electron apps like Claude report the caret a few characters off — then: unknown, fix as usual)
+                let probe = String(Predictor.shared.recentTypedTail.suffix(3))
+                let verified = probe.count >= 2 && (before?.hasSuffix(probe) ?? false)
+                if (lastBoundary == nil && verified && (before?.last?.isLetter ?? false))
+                    || (addressish && before.map(Self.inAddress) == true) {
+                    disabled = true
+                    Log.write("word continues existing text or an address: no layout fix")
+                }
+            }
+            continuesWord = false
         }
         let screen = screenLang ?? cur.lang
 
@@ -235,11 +359,44 @@ final class Engine {
         return boundary(event: event, ks: ks, cur: cur, kind: .symbol)
     }
 
+    /// Inline calculator: reads the line before the caret (it ends with "="), evaluates what precedes it.
+    /// Without Accessibility falls back to the typed keys.
+    private func scheduleCalc(typed: String, attempt: Int) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) { [weak self] in
+            guard let self = self else { return }
+            var result: String?
+            var lineText: String?
+            if let line = Calculator.lineBeforeCaret() {
+                guard line.hasSuffix("=") else {
+                    if attempt < 4 { self.scheduleCalc(typed: typed, attempt: attempt + 1) }   // app not caught up yet
+                    return
+                }
+                lineText = String(line.dropLast())
+                result = Calculator.evaluate(Calculator.tail(lineText!))
+            } else {
+                result = Calculator.evaluate(typed)
+            }
+            if let r = result {
+                Injector.type(r)
+                self.calcBuf = r                         // chains: 600*2=1200+200=
+                Log.write("calc")
+                return
+            }
+            // units and currencies: "1 pound in kg =", "25 usd/uah ="
+            guard let lt = lineText else { return }
+            Converter.evaluate(lt) { conv in
+                guard let c = conv, Calculator.lineBeforeCaret()?.hasSuffix("=") == true else { return }
+                Injector.type((lt.hasSuffix(" ") ? " " : "") + c)   // "kg = 0.45 kg" / "kg=0.45 kg"
+                Log.write("calc: conversion")
+            }
+        }
+    }
+
     private func appendLetter(_ ks: KeyStroke) -> Result {
         keys.append(ks)
         convertCycle = []
         if keys.count > 40 { disabled = true }
-        guard !disabled, corrections < 2, keys.count >= settings.minLetters else { return .pass }
+        guard !disabled, !holdUntilSpace, corrections < 2, keys.count >= settings.minLetters else { return .pass }
         if let d = decideMidWord() {
             apply(to: d, typedSoFarExcludingLast: true, manual: false)
             Log.write("mid fix len=\(keys.count) -> \(d.rawValue)")
@@ -249,10 +406,14 @@ final class Engine {
     }
 
     private func backspace() {
+        erasedSinceSpace = true
+        if keys.isEmpty { lastBoundary = nil }
         if !calcBuf.isEmpty { calcBuf.removeLast() }
         if keys.isEmpty {
+            if last?.correction.map({ !$0.manual }) == true { holdUntilSpace = true }   // erasing a fixed word
             last = nil
         } else {
+            if correction.map({ !$0.manual }) == true { holdUntilSpace = true }
             if keys.count == 1, settings.implicitUndo, let c = correction, !c.manual,
                let fromL = layouts.layouts[c.from], !correctionKeys.isEmpty {
                 // user erased the word we corrected — treat as undo
@@ -270,14 +431,22 @@ final class Engine {
     private enum BoundaryKind { case space, control, symbol }
 
     private func boundary(event: CGEvent, ks: KeyStroke, cur: KeyLayout, kind: BoundaryKind) -> Result {
-        defer { convertCycle = [] }
+        switch kind {
+        case .space: lastBoundary = " "
+        case .control: lastBoundary = code(ks) == 48 ? "\t" : "\n"
+        case .symbol: lastBoundary = cur.char(ks)?.first
+        }
+        defer {
+            convertCycle = []
+            if kind != .symbol { holdUntilSpace = false; erasedSinceSpace = false }
+        }
         guard !keys.isEmpty, let screen = screenLang else {
             resetWord(); last = nil
             return .pass
         }
         var result = Result.pass
         if let ch = cur.char(ks), ".!?\r\n".contains(ch) || code(ks) == 36 { pendingSentenceEnd = true }
-        if !disabled, let target = decideFinal() {
+        if !disabled, !holdUntilSpace, let target = decideFinal() {
             let boundaryChar = cur.char(ks) ?? ""
             apply(to: target, typedSoFarExcludingLast: false, manual: false, capitalize: shouldCapitalize(target))
             Log.write("final fix len=\(keys.count) -> \(target.rawValue)")
@@ -303,7 +472,7 @@ final class Engine {
         }
         finishWord(endedWithSpace: kind == .space)
         sentenceStart = pendingSentenceEnd
-        if pendingSentenceEnd { sentence = []; pendingSentenceEnd = false }
+        if pendingSentenceEnd { sentence = []; pendingSentenceEnd = false; prevTyped = nil }
         return result
     }
 
@@ -355,6 +524,16 @@ final class Engine {
         }
         if let lang = screenLang, !disabled || correction != nil {
             learnPhrase(word: core(keys, lang), lang: lang, sentenceEnd: false)
+            // the user's own vocabulary (word counts only) — completes their words first ("земсн" → "земснаряд")
+            let w = core(keys, lang)
+            if settings.learning, w.count >= 3, w.count <= 32, w.allSatisfy({ TextNorm.isLetter($0, lang) || $0 == "-" || $0 == "'" }) {
+                _ = store.bump("uw:\(lang.rawValue):\(w)")
+                // word pairs within a sentence: after "external" this user writes "power"
+                if let p = prevTyped, p.lang == lang, !sentenceStart || p.word != w { _ = store.bump("ub:\(lang.rawValue):\(p.word) \(w)") }
+                prevTyped = (w, lang)
+            } else {
+                prevTyped = nil
+            }
         }
         if let lang = screenLang {
             if let c = correction, !c.manual, let fromL = layouts.layouts[c.from] {
@@ -442,8 +621,18 @@ final class Engine {
         return best.score >= second.score * ambiguityRatio ? best.lang : nil
     }
 
+    /// Only punctuation on screen ("..", ",,,", "...."): an ellipsis or a separator, not a word in another layout
+    /// ("..." is "ююю" in the Russian layout — never convert while typing; at the end only into a common word).
+    private func onlyPunctuation(_ o: Lang) -> Bool {
+        guard let l = layouts.layouts[o] else { return false }
+        return !l.text(keys).contains { $0.isLetter }
+    }
+
     private func decideMidWord() -> Lang? {
-        guard let o = screenLang, !untouchableCase(keys, final: false) else { return nil }
+        guard let o = screenLang, !untouchableCase(keys, final: false), !onlyPunctuation(o) else { return nil }
+        // A capital first letter is usually a name or a place ("Uk|raine" looked like "Гл|авный" after two letters):
+        // decide only from the third letter on
+        if let f = keys.first, f.shift != f.caps, keys.count < 3 { return nil }
         let oText = core(keys, o)
         guard keys.count >= settings.minLetters, !store.isException(oText, o) else { return nil }
         let pO = prefixScore(oText, o)
@@ -467,6 +656,10 @@ final class Engine {
         let alts = alternatives(keys, excluding: o, score: wordScore, minScore: minScore)
         guard let best = alts.first else { return nil }
         if fO > 0 && best.score < fO * finalRatio { return nil }
+        if onlyPunctuation(o) {
+            // ",tp" → "без" is fine (letters follow), but "..." / ",," stay: same key repeated, or a rare word
+            if Set(keys.map(\.code)).count == 1 || best.score < 1000 { return nil }
+        }
         if keys.count < settings.minLetters {
             // short words ("yf" → "на"): the alternative must be a very common word and the original junk,
             // or the previous word must be in the same script
@@ -499,6 +692,11 @@ final class Engine {
 
     // MARK: - Undo
 
+    private var canUndoAutoFix: Bool {
+        if !keys.isEmpty { return correction.map { !$0.manual } ?? false }
+        return last?.correction.map { !$0.manual } ?? false
+    }
+
     func undo() {
         if SpellFix.shared.undoLast() { reset(); return }
         if !keys.isEmpty, let c = correction, let cur = screenLang,
@@ -508,6 +706,7 @@ final class Engine {
             Injector.type(fromL.text(keys))
             screenLang = c.from
             disabled = true
+            holdUntilSpace = true
             correction = nil
             recordUndo(c, original: TextNorm.normalize(fromL.text(keys), c.from))
             return
@@ -550,7 +749,22 @@ final class Engine {
 
     // MARK: - Manual conversion
 
+    func spellFix() { if settings.enabled, !excludedApp { spellHotkey() } }
+
     func convert() {
+        Selection.read { [weak self] sel in
+            guard let self = self else { return }
+            // some apps (Electron) report a "selection" that is only whitespace or stale: real selected text has letters
+            Log.write("convert: selection=\(sel.map { "\($0.count) chars" } ?? "n/a")")
+            if let s = sel, s.contains(where: { $0.isLetter }), Selection.convertLayout(s) {
+                self.reset()
+            } else {
+                self.convertWord()
+            }
+        }
+    }
+
+    private func convertWord() {
         Log.write("convert: word=\(keys.count) last=\(last?.keys.count ?? -1)")
         if !keys.isEmpty, let from = screenLang {
             guard let target = chooseTarget(keys, from: from) else { return }
@@ -613,7 +827,8 @@ final class Engine {
     }
 
     private func learnUnknown(_ lang: Lang) {
-        guard settings.learning, !disabled || correction != nil, let l = layouts.layouts[lang] else { return }
+        // an unknown word produced by OUR automatic fix ("Ukraine" → "Глкфшту") is not the user's word — never learn it
+        guard settings.learning, correction.map({ $0.manual }) ?? !disabled, let l = layouts.layouts[lang] else { return }
         guard let w = candidate(keys, l), isLearnable(w, lang), wordScore(w, lang) == 0 else { return }
         if store.isException(w, lang) { return }
         // Names, places (Capitalized) and abbreviations (ALL CAPS) are learned faster

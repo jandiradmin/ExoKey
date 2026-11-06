@@ -54,6 +54,7 @@ final class SettingsUIState: ObservableObject {
     let recConvert = HotkeyRecorder()
     let recPause = HotkeyRecorder()
     let recSpell = HotkeyRecorder()
+    let recCase = HotkeyRecorder()
 }
 
 final class AIRecorders {
@@ -129,6 +130,7 @@ struct AISection: View {
                 Text(L.t("ai.confidence.0")).tag(0)
                 Text(L.t("ai.confidence.1")).tag(1)
                 Text(L.t("ai.confidence.2")).tag(2)
+                Text(L.t("ai.confidence.3")).tag(3)
             }
             .pickerStyle(.segmented)
             Stepper("\(L.t("ai.delay")): \(s.aiDelay)", value: $s.aiDelay, in: 100...1500, step: 50)
@@ -147,6 +149,8 @@ struct AISection: View {
             Toggle(L.t("ai.learnStyle"), isOn: $s.aiLearnStyle)
             Text(L.t("ai.learnStyle.hint")).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Button(L.t("ai.learnStyle.clear")) { StyleMemory.shared.clear() }
+            if AIModel.shared.hasAdapter(.textbook) { Toggle(L.t("ai.textbook"), isOn: $s.aiTextbook) }
+            if AIModel.shared.hasAdapter(.mystyle) { Toggle(L.t("ai.mystyle"), isOn: $s.aiMyStyle) }
             Toggle(L.t("ai.personal"), isOn: $s.aiPersonalization)
             Toggle(L.t("ai.learnPhrases"), isOn: $s.learnPhrases).disabled(!s.aiPersonalization)
             Button(L.t("ai.clear")) { UserStore.shared.clearPersonalization() }
@@ -219,6 +223,7 @@ struct SettingsView: View {
                 LabeledContent(L.t("hk.convert")) { HotkeyField(hotkey: $s.hkConvert, rec: ui.recConvert) }
                 LabeledContent(L.t("hk.pause")) { HotkeyField(hotkey: $s.hkPause, rec: ui.recPause) }
                 LabeledContent(L.t("hk.spell")) { HotkeyField(hotkey: $s.hkSpell, rec: ui.recSpell) }
+                LabeledContent(L.t("hk.case")) { HotkeyField(hotkey: $s.hkCase, rec: ui.recCase) }
             }
             Section(L.t("set.extras")) {
                 Picker(L.t("set.spell"), selection: Binding(get: { s.spellMode }, set: { s.spellMode = $0; SpellFix.shared.warmUp() })) {
@@ -236,6 +241,9 @@ struct SettingsView: View {
                 Toggle(L.t("set.fixNameCase"), isOn: $s.fixNameCase)
                 Toggle(L.t("set.skipAllCaps"), isOn: $s.skipAllCaps)
                 Toggle(L.t("set.calculator"), isOn: $s.calculator)
+                Toggle(L.t("set.checkUpdates"), isOn: $s.checkUpdates)
+                Toggle(L.t("set.contacts"), isOn: Binding(get: { s.contactsEnabled },
+                                                          set: { s.contactsEnabled = $0; if $0 { ContactPicker.shared.ensureLoaded() } }))
                 Toggle(L.t("set.learnNames"), isOn: $s.learnNames)
                 Toggle(L.t("set.implicitUndo"), isOn: $s.implicitUndo)
             }

@@ -60,6 +60,19 @@ final class KeyLayout {
 
     func text(_ keys: [KeyStroke]) -> String { keys.map { char($0) ?? "" }.joined() }
 
+    /// Key that types `ch` in this layout (without Caps Lock).
+    func keystroke(for ch: String) -> KeyStroke? {
+        if reverse.isEmpty {
+            for (k, s) in map where k & 2 == 0 {
+                let ks = KeyStroke(code: UInt16(k >> 2), shift: k & 1 == 1, caps: false)
+                if let old = reverse[s], !old.shift || ks.shift { continue }   // prefer the unshifted key
+                reverse[s] = ks
+            }
+        }
+        return reverse[ch]
+    }
+    private var reverse: [String: KeyStroke] = [:]
+
     func isLetter(_ k: KeyStroke) -> Bool {
         guard let s = char(k), s.count == 1, let c = s.first else { return false }
         return TextNorm.isLetter(c, lang)

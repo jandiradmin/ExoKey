@@ -22,6 +22,10 @@
 	<true/>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSContactsUsageDescription</key>
+	<string>ExoKey inserts a contact when you type @name. Contacts stay on this Mac.</string>
+	<key>ExoKeyDonateURL</key>
+	<string>https://paypal.me/YanHordashevskyy</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>ExoKey — open source</string>
 </dict>

@@ -6,7 +6,7 @@ enum CaretLocator {
     static func caretRect() -> CGRect? {
         Predictor.shared.enableAccessibility(for: NSWorkspace.shared.frontmostApplication)
         let sys = AXUIElementCreateSystemWide()
-        AXUIElementSetMessagingTimeout(sys, 0.15)
+        AXUIElementSetMessagingTimeout(sys, 0.3)   // heavy web apps answer slowly
         var f: CFTypeRef?
         guard AXUIElementCopyAttributeValue(sys, kAXFocusedUIElementAttribute as CFString, &f) == .success,
               let v = f, CFGetTypeID(v) == AXUIElementGetTypeID() else { return nil }

@@ -6,8 +6,6 @@ cd "$(dirname "$0")/.."
 export PATH="/opt/homebrew/bin:$PATH"
 VER="${1:?version, e.g. 0.1.0}"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VER" Resources/Info.plist
-BUILD=$(( $(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" Resources/Info.plist) + 1 ))
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" Resources/Info.plist
 scripts/build_app.sh
 ZIP="build/ExoKey-$VER.zip"
 rm -f "$ZIP"

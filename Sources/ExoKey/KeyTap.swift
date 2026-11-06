@@ -59,7 +59,12 @@ private func keyTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CG
             let nav: Set<Int64> = [51, 53, 115, 116, 117, 119, 121, 123, 124, 125, 126, 36, 76, 48]
             DispatchQueue.main.async {
                 if code == 36 || code == 76 { Predictor.shared.messageSent() }
-                if nav.contains(code) && code != 51 { Predictor.shared.hide(); return }
+                if code == 51 || code == 123 || code == 124 { SpellFix.shared.caretMoved() }
+                if nav.contains(code) && code != 51 {
+                    Predictor.shared.hide()
+                    if [123, 124, 125, 126, 115, 119, 116, 121, 48].contains(code) { LayoutBadge.shared.caretPlaced(delay: 0.35) }
+                    return
+                }
                 Predictor.shared.keyTyped(code: code, typed: code == 51 ? nil : typed)
                 LayoutBadge.shared.keyTyped()
             }
@@ -68,9 +73,11 @@ private func keyTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CG
         }
         return Unmanaged.passUnretained(event)
     case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+        if ContactPicker.shared.contains(event.location) { return Unmanaged.passUnretained(event) }
         Engine.shared.reset()
         FieldGuard.reset()
         Predictor.shared.hide()
+        if type == .leftMouseDown { DispatchQueue.main.async { LayoutBadge.shared.caretPlaced(delay: 0.3) } }
         return Unmanaged.passUnretained(event)
     default:
         return Unmanaged.passUnretained(event)

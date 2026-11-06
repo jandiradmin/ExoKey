@@ -48,6 +48,17 @@ final class LayoutBadge {
         show(seconds: 1.3, mouseFallback: true)
     }
 
+    /// The text caret was placed by a click or moved with the keyboard: show the language that will be typed.
+    /// Only where there is a real text caret (not on clicks elsewhere).
+    private var caretWork: DispatchWorkItem?
+    func caretPlaced(delay: TimeInterval) {
+        guard Settings.shared.badgeMode >= 1 else { return }
+        caretWork?.cancel()
+        let w = DispatchWorkItem { [weak self] in self?.show(seconds: 1.3, mouseFallback: false) }
+        caretWork = w
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: w)
+    }
+
     /// Mode "always": follows the caret while typing.
     func keyTyped() {
         guard Settings.shared.badgeMode == 2 else { return }

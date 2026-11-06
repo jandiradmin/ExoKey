@@ -24,6 +24,16 @@ enum Injector {
 
     static func backspaces(_ n: Int) { key(51, count: n) }
 
+    /// Key with modifiers, e.g. ⌘C or ⇧←.
+    static func key(_ code: CGKeyCode, flags: CGEventFlags, count: Int = 1) {
+        for _ in 0..<max(0, count) {
+            guard let d = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: true),
+                  let u = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: false) else { continue }
+            d.flags = flags; u.flags = flags
+            post(d); post(u)
+        }
+    }
+
     static func type(_ s: String) {
         let units = Array(s.utf16)
         var i = 0

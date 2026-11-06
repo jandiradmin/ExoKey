@@ -29,6 +29,9 @@ final class UserStore: ObservableObject {
     static let shared = UserStore()
     private var db: OpaquePointer?
     @Published private(set) var entries: [UserEntry] = []
+    /// The spell checker and the autocomplete read the store from background queues while typing writes to it:
+    /// every in-memory cache access goes through this lock (a race here crashed ExoKey).
+    private let lock = NSRecursiveLock()
     private var index: [String: Int] = [:]   // key(kind,lang,word) -> entries index
 
     static var dir: URL {
@@ -68,6 +71,7 @@ final class UserStore: ObservableObject {
     private static func key(_ k: EntryKind, _ l: Lang, _ w: String) -> String { "\(k.rawValue)|\(l.rawValue)|\(w)" }
 
     private func load() {
+        lock.lock(); defer { lock.unlock() }
         var out: [UserEntry] = []
         var st: OpaquePointer?
         let sql = "SELECT id,word,lang,kind,target,target_lang,uses,undos,created,last_used,source FROM entries"
@@ -99,12 +103,16 @@ final class UserStore: ObservableObject {
     // MARK: queries (hot path, in memory)
 
     func find(_ kind: EntryKind, _ lang: Lang, _ word: String) -> UserEntry? {
-        index[Self.key(kind, lang, word)].map { entries[$0] }
+        lock.lock(); defer { lock.unlock() }
+        return index[Self.key(kind, lang, word)].map { entries[$0] }
     }
 
     func isWord(_ w: String, _ l: Lang) -> Bool { find(.word, l, w) != nil }
     func isException(_ w: String, _ l: Lang) -> Bool { find(.exception, l, w) != nil }
-    func hasPrefix(_ p: String, _ l: Lang) -> Bool { wordsByLang[l]?.contains { $0.hasPrefix(p) } ?? false }
+    func hasPrefix(_ p: String, _ l: Lang) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return wordsByLang[l]?.contains { $0.hasPrefix(p) } ?? false
+    }
 
     // MARK: mutations
 
@@ -162,6 +170,7 @@ final class UserStore: ObservableObject {
     /// Increments a counter and returns the new value.
     @discardableResult
     func bump(_ key: String) -> Int {
+        lock.lock(); defer { lock.unlock() }
         if ngramCache == nil { loadNgrams() }
         let n = (ngramCache?[key] ?? 0) + 1
         ngramCache?[key] = n
@@ -175,16 +184,19 @@ final class UserStore: ObservableObject {
     }
 
     func clearStats() {
+        lock.lock(); defer { lock.unlock() }
         exec("DELETE FROM ngrams WHERE key LIKE 'stat:%'")
         ngramCache = nil
     }
 
     func count(_ key: String) -> Int {
+        lock.lock(); defer { lock.unlock() }
         if ngramCache == nil { loadNgrams() }
         return ngramCache?[key] ?? 0
     }
 
     private func loadNgrams() {
+        lock.lock(); defer { lock.unlock() }
         var m: [String: Int] = [:]
         var st: OpaquePointer?
         if sqlite3_prepare_v2(db, "SELECT key,count FROM ngrams", -1, &st, nil) == SQLITE_OK {
@@ -198,6 +210,7 @@ final class UserStore: ObservableObject {
 
     /// Clears personalization of autocomplete: learned/accepted phrases and counters.
     func clearPersonalization() {
+        lock.lock(); defer { lock.unlock() }
         exec("DELETE FROM ngrams; DELETE FROM entries WHERE kind IN ('phrase','banned') AND source != 'manual';")
         ngramCache = [:]
         load()
@@ -207,8 +220,27 @@ final class UserStore: ObservableObject {
     var banned: [UserEntry] { entries.filter { $0.kind == .banned } }
 
     /// User dictionary words starting with prefix, most used first.
+    /// Counters whose key starts with `prefix`: (rest of the key, count).
+    func counts(withPrefix prefix: String) -> [(rest: String, count: Int)] {
+        lock.lock(); defer { lock.unlock() }
+        if ngramCache == nil { loadNgrams() }
+        return (ngramCache ?? [:]).compactMap { k, n in k.hasPrefix(prefix) && k.count > prefix.count ? (String(k.dropFirst(prefix.count)), n) : nil }
+    }
+
+    /// Words the user has typed (counts, no text), for completing the current word.
+    func typedWordCompletions(_ prefix: String, _ l: Lang) -> [(word: String, count: Int)] {
+        lock.lock(); defer { lock.unlock() }
+        if ngramCache == nil { loadNgrams() }
+        let k = "uw:\(l.rawValue):\(prefix)"
+        let head = "uw:\(l.rawValue):".count
+        return (ngramCache ?? [:]).compactMap { key, n in
+            key.hasPrefix(k) && key.count > k.count ? (String(key.dropFirst(head)), n) : nil
+        }
+    }
+
     func userCompletions(_ prefix: String, _ l: Lang) -> [String] {
-        (wordsByLang[l] ?? []).filter { $0.hasPrefix(prefix) && $0 != prefix }
+        lock.lock(); defer { lock.unlock() }
+        return (wordsByLang[l] ?? []).filter { $0.hasPrefix(prefix) && $0 != prefix }
     }
 
     // MARK: writing style (opt-in): the user's own finished sentences

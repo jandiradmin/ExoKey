@@ -12,9 +12,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let settings = Settings.shared
 
     func applicationDidFinishLaunching(_ n: Notification) {
+        // only one ExoKey at a time (a second copy, e.g. from the build folder, would fight over the keyboard)
+        let others = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "")
+            .filter { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }
+        if !others.isEmpty {
+            Log.write("another ExoKey is running (\(others.map { $0.bundleURL?.path ?? "?" })), quitting this one")
+            NSApp.terminate(nil)
+            return
+        }
         NSApp.appearance = NSAppearance(named: .darkAqua)
         _ = UserStore.shared
         _ = LayoutManager.shared
+        Updater.shared.start()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.showThanksIfNeeded() }
         let engine = Engine.shared
         engine.onStateChange = { [weak self] in self?.updateStatus() }
 
@@ -24,11 +34,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.menu = menu
         updateStatus()
 
+        DistributedNotificationCenter.default().addObserver(forName: Notification.Name("app.exokey.dumpContext"),
+                                                            object: nil, queue: .main) { _ in Predictor.shared.debugDump() }
+        // scripted checks of the updater (same as the menu items)
+        DistributedNotificationCenter.default().addObserver(forName: Notification.Name("app.exokey.checkUpdates"),
+                                                            object: nil, queue: .main) { _ in Updater.shared.check(manual: true) }
+        DistributedNotificationCenter.default().addObserver(forName: Notification.Name("app.exokey.installUpdate"),
+                                                            object: nil, queue: .main) { _ in Updater.shared.install() }
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
         ) { [weak self] n in
             self?.updateExcluded()
             Engine.shared.reset()
+            Engine.shared.holdUntilSpace = false
             let app = n.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
             Predictor.shared.hide()
             LayoutBadge.shared.hide()
@@ -136,6 +154,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(item(L.t("menu.permissions"), #selector(askPermissions)))
             menu.addItem(.separator())
         }
+        if let u = Updater.shared.available {
+            let up = item(L.t(Updater.shared.installing ? "upd.downloading" : "menu.update", u.version), #selector(installUpdate))
+            up.isEnabled = !Updater.shared.installing
+            menu.addItem(up)
+            menu.addItem(.separator())
+        }
         let en = item(L.t("menu.enabled"), #selector(toggleEnabled), key: settings.hkPause)
         en.state = settings.enabled ? .on : .off
         menu.addItem(en)
@@ -146,6 +170,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         menu.addItem(item(L.t("menu.undo"), #selector(undo), key: settings.hkUndo))
         menu.addItem(item(L.t("menu.convert"), #selector(convert), key: settings.hkConvert))
+        menu.addItem(item(L.t("menu.case"), #selector(changeCase), key: settings.hkCase))
+        menu.addItem(item(L.t("menu.spell"), #selector(spellFix), key: settings.hkSpell))
         menu.addItem(.separator())
         if let app = NSWorkspace.shared.frontmostApplication, let id = app.bundleIdentifier,
            id != Bundle.main.bundleIdentifier {
@@ -171,6 +197,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             lock.state = settings.appLayoutLocks.contains(id) ? .on : .off
             lock.isEnabled = current != nil
             sub.addItem(lock)
+            sub.addItem(.separator())
+            // quick exclusions for this app: ExoKey does nothing here / no autocomplete here
+            let ex = NSMenuItem(title: L.t("menu.excludeApp"), action: #selector(toggleExcluded(_:)), keyEquivalent: "")
+            ex.target = self; ex.representedObject = id
+            ex.state = settings.excludedApps.contains(id) ? .on : .off
+            sub.addItem(ex)
+            let exAI = NSMenuItem(title: L.t("menu.excludeAI"), action: #selector(toggleExcludedAI(_:)), keyEquivalent: "")
+            exAI.target = self; exAI.representedObject = id
+            exAI.state = settings.isAIExcluded(id) ? .on : .off
+            sub.addItem(exAI)
             let parent = NSMenuItem(title: L.t("menu.appLayout", name), action: nil, keyEquivalent: "")
             parent.submenu = sub
             menu.addItem(parent)
@@ -182,6 +218,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         au.state = settings.autostart ? .on : .off
         menu.addItem(au)
         menu.addItem(.separator())
+        if Self.donateURL != nil { menu.addItem(item(L.t("menu.donate"), #selector(donate))) }
+        menu.addItem(item(L.t("menu.restart"), #selector(restartApp)))
+        menu.addItem(item(L.t("menu.checkUpdates"), #selector(checkUpdates)))
         menu.addItem(item(L.t("menu.about"), #selector(about)))
         menu.addItem(item(L.t("menu.quit"), #selector(quit)))
     }
@@ -202,6 +241,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         line(L.t("stats.spell", "\(ss)") + " · " + L.t("stats.accepted", "\(sa) (\(Stats.pct(sa, max(ss, sa))))") + " · " + L.t("stats.undone", "\(su)"))
         let lf = Stats.get(.layoutFixed), lu = Stats.get(.layoutUndone)
         line(L.t("stats.layout", "\(lf)") + " · " + L.t("stats.undone", "\(lu) (\(Stats.pct(lu, lf)))"))
+        if Stats.get(.contactInserted) > 0 { line(L.t("stats.contacts", "\(Stats.get(.contactInserted))")) }
         if let d = Stats.since {
             let f = DateFormatter(); f.dateStyle = .medium
             line(L.t("stats.since", f.string(from: d)))
@@ -216,6 +256,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func resetStats() { Stats.reset() }
+
+    @objc private func toggleExcluded(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        if settings.excludedApps.contains(id) { settings.excludedApps.removeAll { $0 == id } } else { settings.excludedApps.append(id) }
+        Engine.shared.reset()
+    }
+
+    @objc private func toggleExcludedAI(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        if settings.aiExcludedApps.contains(id) { settings.aiExcludedApps.removeAll { $0 == id } } else { settings.aiExcludedApps.append(id) }
+        Predictor.shared.hide()
+    }
 
     @objc private func toggleAppLock(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
@@ -236,14 +288,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func askPermissions() { startTapOrAskPermission() }
     @objc private func toggleEnabled() { settings.enabled.toggle(); Engine.shared.reset(); updateStatus() }
     @objc private func toggleAutostart() { settings.autostart.toggle() }
-    @objc private func undo() { Engine.shared.undo() }
-    @objc private func convert() { Engine.shared.convert() }
+    // menu closes first, then the action goes to the app the user was typing in
+    private func afterMenu(_ f: @escaping () -> Void) { DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: f) }
+    @objc private func undo() { afterMenu { Engine.shared.undo() } }
+    @objc private func convert() { afterMenu { Engine.shared.convert() } }
+    @objc private func changeCase() { afterMenu { Selection.changeCase() } }
+    @objc private func spellFix() { afterMenu { Engine.shared.spellFix() } }
     @objc private func quit() { NSApp.terminate(nil) }
+
+    /// PayPal donation link (Info.plist "ExoKeyDonateURL"); the button is hidden while it is empty.
+    static var donateURL: URL? {
+        (Bundle.main.object(forInfoDictionaryKey: "ExoKeyDonateURL") as? String).flatMap { $0.isEmpty ? nil : URL(string: $0) }
+    }
+    @objc private func donate() { if let u = Self.donateURL { NSWorkspace.shared.open(u) } }
+
+    /// Restart from the menu: the new process says thank you (with a donate button).
+    @objc private func restartApp() {
+        UserDefaults.standard.set(true, forKey: "showThanks")
+        let path = Bundle.main.bundleURL.path
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/sh")
+        p.arguments = ["-c", "while kill -0 \(ProcessInfo.processInfo.processIdentifier) 2>/dev/null; do sleep 0.2; done; open \"\(path)\""]
+        try? p.run()
+        Log.write("restart from menu")
+        NSApp.terminate(nil)
+    }
+
+    private func showThanksIfNeeded() {
+        let d = UserDefaults.standard
+        guard d.bool(forKey: "showThanks") else { return }
+        d.set(false, forKey: "showThanks")
+        NSApp.activate(ignoringOtherApps: true)
+        let a = NSAlert()
+        a.messageText = L.t("thanks.title")
+        a.informativeText = L.t("thanks.text")
+        a.icon = NSApp.applicationIconImage
+        if Self.donateURL != nil { a.addButton(withTitle: L.t("menu.donate")) }
+        a.addButton(withTitle: L.t("thanks.close"))
+        if Self.donateURL != nil, a.runModal() == .alertFirstButtonReturn { donate() }
+        else if Self.donateURL == nil { a.runModal() }
+    }
+
+    @objc private func installUpdate() { Updater.shared.install() }
+    @objc private func checkUpdates() { Updater.shared.check(manual: true) }
 
     @objc private func about() {
         NSApp.activate(ignoringOtherApps: true)
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: "ExoKey",
+            .applicationVersion: Updater.currentVersion,
+            .version: "build " + Updater.currentBuild,
             .credits: NSAttributedString(string: "Layout switcher for English, Russian, Ukrainian.\nDictionaries: FrequencyWords (CC BY-SA 4.0), LibreOffice hunspell dictionaries."),
         ])
     }

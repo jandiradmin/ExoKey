@@ -1,4 +1,6 @@
 import AppKit
+import ApplicationServices
+import Carbon
 
 final class SpellFix {
     static let shared = SpellFix()
@@ -118,7 +120,9 @@ final class SpellFix {
     func keyDown(code: UInt16, flags: CGEventFlags, char: String?) -> Bool {
         keysSinceApply += 1
         let plain = flags.intersection([.maskCommand, .maskControl, .maskAlternate]).isEmpty
-        if isOffering && plain && !flags.contains(.maskShift) {
+        // Tab / Esc belong to the AI suggestion when one is on screen: accepting a typo fix instead of the phrase
+        // the user is looking at was confusing (and a revisited-word fix could replace the wrong text)
+        if isOffering && plain && !flags.contains(.maskShift) && !Predictor.shared.isVisible {
             if code == 48 { accept(); return true }
             if code == 53 { dismiss(); return true }
         }
@@ -137,6 +141,7 @@ final class SpellFix {
     }
 
     func dismiss() {
+        revisit = nil
         offer = nil
         typedAfter = nil
         autoHide?.cancel()
@@ -144,6 +149,11 @@ final class SpellFix {
     }
 
     private func accept() {
+        if revisit != nil {
+            _ = acceptRevisit()          // never falls back to erasing: the caret may be anywhere in the text
+            dismiss()
+            return
+        }
         guard let o = offer else { return }
         let after = typedAfter ?? ""
         dismiss()
@@ -188,6 +198,91 @@ final class SpellFix {
                 self.replace(orig: typed, fix: fix, boundary: boundary)
             }
         }
+    }
+
+    // MARK: word under the caret (the user came back to it with arrows or backspace)
+
+    private var revisitWork: DispatchWorkItem?
+    private var lastRevisit = ""
+    /// A word fixed in place: its range in the field, for accepting.
+    private var revisit: (element: AXUIElement, range: CFRange, fix: String)?
+
+    /// Called after arrows / backspace; checks the word at the caret after a short pause.
+    func caretMoved() {
+        guard Settings.shared.spellMode > 0 else { return }
+        revisitWork?.cancel()
+        let w = DispatchWorkItem { [weak self] in self?.checkWordAtCaret() }
+        revisitWork = w
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: w)
+    }
+
+    private func checkWordAtCaret() {
+        if indexes.isEmpty { warmUp(); return }
+        // only words ExoKey isn't tracking right now (the word being typed is checked when it is finished)
+        guard !Engine.shared.typingWord, !Predictor.shared.isVisible else { return }
+        guard !IsSecureEventInputEnabled(), !FieldGuard.focusedIsSensitive() else { return }
+        let sys = AXUIElementCreateSystemWide()
+        AXUIElementSetMessagingTimeout(sys, 0.15)
+        var f: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(sys, kAXFocusedUIElementAttribute as CFString, &f) == .success,
+              let v = f, CFGetTypeID(v) == AXUIElementGetTypeID() else { return }
+        let e = v as! AXUIElement
+        var val: CFTypeRef?, rr: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(e, kAXValueAttribute as CFString, &val) == .success, let text = val as? String,
+              AXUIElementCopyAttributeValue(e, kAXSelectedTextRangeAttribute as CFString, &rr) == .success,
+              let r = rr, CFGetTypeID(r) == AXValueGetTypeID() else { return }
+        var range = CFRange()
+        AXValueGetValue(r as! AXValue, .cfRange, &range)
+        let ns = text as NSString
+        guard range.length == 0, range.location <= ns.length else { return }
+        // word around the caret
+        func isWordChar(_ i: Int) -> Bool {
+            guard i >= 0, i < ns.length, let u = UnicodeScalar(ns.character(at: i)) else { return false }
+            return CharacterSet.letters.contains(u) || u == "'" || u == "’" || u == "-"
+        }
+        var a = range.location, b = range.location
+        while isWordChar(a - 1) { a -= 1 }
+        while isWordChar(b) { b += 1 }
+        guard b - a >= 3 else { return }
+        let word = ns.substring(with: NSRange(location: a, length: b - a))
+        let key = "\(a):\(word)"
+        guard key != lastRevisit else { return }
+        lastRevisit = key
+        let cyr = word.unicodeScalars.contains { (0x400...0x4FF).contains($0.value) }
+        let cur = LayoutManager.shared.currentLang
+        let lang: Lang = cyr ? (cur == .uk || cur == .ru ? cur! : .ru) : .en
+        queue.async {
+            guard let fix = self.correction(word, lang, auto: false) else { return }
+            DispatchQueue.main.async {
+                self.generation += 1
+                self.offer = (word, fix, "")
+                self.typedAfter = nil
+                self.revisit = (e, CFRange(location: a, length: b - a), fix)
+                let placed = self.showPanel(fix)
+                Stats.add(.spellShown)
+                Log.write("spell: offered for a revisited word (\(placed))")
+            }
+        }
+    }
+
+    /// Tab on a revisited word: select it in the field and type the fix over it.
+    private func acceptRevisit() -> Bool {
+        guard let rv = revisit else { return false }
+        revisit = nil
+        var r = rv.range
+        guard let sel = AXValueCreate(.cfRange, &r),
+              AXUIElementSetAttributeValue(rv.element, kAXSelectedTextRangeAttribute as CFString, sel) == .success else { return false }
+        // make sure exactly the misspelled word is selected (some apps select something else or nothing)
+        var st: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(rv.element, kAXSelectedTextAttribute as CFString, &st) == .success,
+              let selected = st as? String, let o = offer, selected == o.orig else {
+            Log.write("spell: revisited word not selected as expected — nothing replaced")
+            return false
+        }
+        Injector.type(rv.fix)
+        Stats.add(.spellAccepted)
+        Log.write("spell: accepted (revisited word)")
+        return true
     }
 
     // MARK: plaque

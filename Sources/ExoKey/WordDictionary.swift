@@ -130,6 +130,60 @@ final class WordDictionary {
     }
 
     /// Most frequent word that starts with `prefix` (longer than it). Scans at most `limit` words.
+    /// The two most frequent longer words for a prefix: (best word, its frequency, second frequency).
+    func topCompletions(_ prefix: String, limit: Int = 60000) -> (word: String, f1: Int, f2: Int)? {
+        let l = topK(prefix, k: 2, limit: limit)
+        guard let first = l.first else { return nil }
+        return (first.word, first.freq, l.count > 1 ? l[1].freq : 0)
+    }
+
+    /// The k most frequent longer words for a prefix, most frequent first.
+    func topK(_ prefix: String, k: Int, limit: Int = 60000) -> [(word: String, freq: Int)] {
+        let key = Array(prefix.utf8)
+        guard key.count >= 2, nBlocks > 0 else { return [] }
+        var lo = 0, hi = nBlocks - 1, blk = 0
+        while lo <= hi {
+            let mid = (lo + hi) / 2
+            if firstWordCompare(block: mid, key) < 0 { blk = mid; lo = mid + 1 } else { hi = mid - 1 }
+        }
+        var pos = dataPos + u32(offsetsPos + blk * 4)
+        var idx = blk * blockSize
+        var cur = [UInt8](repeating: 0, count: 256)
+        var len = 0
+        var top: [([UInt8], Int)] = []
+        var scanned = 0
+        while idx < count, scanned < limit {
+            if idx % blockSize == 0 {
+                pos = dataPos + u32(offsetsPos + (idx / blockSize) * 4)
+                len = varint(&pos)
+                for j in 0..<len { cur[j] = byte(pos + j) }
+                pos += len
+            } else {
+                let shared = Int(byte(pos)); pos += 1
+                let suf = varint(&pos)
+                for j in 0..<suf { cur[shared + j] = byte(pos + j) }
+                pos += suf
+                len = shared + suf
+            }
+            let fr = varint(&pos)
+            idx += 1
+            let hasPrefix = len >= key.count && (0..<key.count).allSatisfy { cur[$0] == key[$0] }
+            if hasPrefix {
+                scanned += 1
+                guard len > key.count else { continue }
+                if top.count < k || fr > top[top.count - 1].1 {
+                    top.append((Array(cur[0..<len]), fr))
+                    top.sort { $0.1 > $1.1 }
+                    if top.count > k { top.removeLast() }
+                }
+            } else {
+                let c = cur.withUnsafeBufferPointer { Self.compare(UnsafeBufferPointer(rebasing: $0[0..<len]), key) }
+                if c > 0 { break }
+            }
+        }
+        return top.compactMap { t in String(bytes: t.0, encoding: .utf8).map { ($0, t.1) } }
+    }
+
     func bestCompletion(_ prefix: String, limit: Int = 40000) -> (word: String, freq: Int)? {
         let key = Array(prefix.utf8)
         guard key.count >= 2, nBlocks > 0 else { return nil }

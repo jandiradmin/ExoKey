@@ -25,6 +25,7 @@ final class Predictor {
 
     // last insertion (for undo and learning)
     private var lastInsert = ""
+    private(set) var lastInsertedChar: Character?
     private var lastInsertLang: Lang = .en
     private var keysSinceInsert = 0
 
@@ -62,7 +63,7 @@ final class Predictor {
 
     private var available: Bool {
         let s = Settings.shared
-        guard s.aiEnabled, !IsSecureEventInputEnabled(), !FieldGuard.focusedIsSensitive() else { return false }
+        guard s.aiEnabled, !Engine.shared.excludedApp, !IsSecureEventInputEnabled(), !FieldGuard.focusedIsSensitive() else { return false }
         if let id = NSWorkspace.shared.frontmostApplication?.bundleIdentifier, s.isAIExcluded(id) { return false }
         guard let l = LayoutManager.shared.currentLang, s.aiLangs.contains(l) else { return false }
         return true
@@ -73,7 +74,15 @@ final class Predictor {
     // MARK: Key flow
 
     /// Called after a key event was delivered to the app. `typed` — produced character (nil for non-text).
+    /// Characters typed since the last click / navigation (the real caret follows them).
+    private var recentTyped = ""
+    var recentTypedTail: String { recentTyped }
+
     func keyTyped(code: Int64, typed: String?) {
+        if let t = typed, t.count == 1 { recentTyped = String((recentTyped + t).suffix(40)) }
+        else if code == 51 { if !recentTyped.isEmpty { recentTyped.removeLast() } }
+        else if code >= 0 { recentTyped = "" }
+        if ContactPicker.shared.isVisible { hide(); return }
         if code < 0 && suppressed { return }      // our own swallowed key (e.g. Esc) — stay hidden
         suppressed = false
         keysSinceInsert += 1
@@ -100,11 +109,11 @@ final class Predictor {
         schedule()
     }
 
-    func schedule() {
+    func schedule(extraDelay: Double = 0) {
         WindowContext.shared.refresh()
         timer?.invalidate()
         generation += 1
-        let delay = Double(max(50, Settings.shared.aiDelay)) / 1000
+        let delay = Double(max(50, Settings.shared.aiDelay)) / 1000 + extraDelay
         timer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in self?.request() }
     }
 
@@ -148,6 +157,8 @@ final class Predictor {
             namePartial = ""
         }
         Injector.type(part)
+        lastInsertedChar = part.last
+        if let last = part.last, last.isLetter { Engine.shared.continuesWord = true }   // "калькулятор|" + "ом"
         lastInsert = part
         lastInsertLang = suggestionLang
         keysSinceInsert = 0
@@ -155,7 +166,9 @@ final class Predictor {
         Log.write("ai: accepted \(all ? "all" : "word")")
         if part == suggestion {
             hide()
-            schedule()
+            // the app needs a moment to show the inserted text: asking right away read the old caret position
+            // and the next suggestion never came ("suggestions disappear after Tab")
+            schedule(extraDelay: 0.3)
         } else {
             suggestion.removeFirst(part.count)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in self?.reposition() }
@@ -216,16 +229,65 @@ final class Predictor {
 
     private struct Ctx { let text: String; let anchor: CGRect; let kind: AnchorKind }
 
-    private func fail(_ r: String) -> Ctx? {
+    /// Diagnostics (aiDebug only): what the autocomplete sees in the frontmost app, written to a local log file.
+    func debugDump() {
+        guard UserDefaults.standard.bool(forKey: "aiDebug"), let app = NSWorkspace.shared.frontmostApplication else { return }
+        enableAccessibility(for: app)
+        lastReason = ""
+        let ctx = readContext()
+        let win = WindowContext.collect(pid: app.processIdentifier)
+        var out = "app: \(app.bundleIdentifier ?? "-")\nwindow: \(win.title)\n"
+        out += "field: " + (ctx.map { "ok, \($0.text.count) chars before caret, anchor=\($0.kind) rect=\($0.anchor)" } ?? "FAIL \(lastReason)") + "\n"
+        out += "screens: " + NSScreen.screens.map { "\($0.frame)" }.joined(separator: " ") + "\n"
+        // focused element details (why the caret can't be found)
+        let sys = AXUIElementCreateSystemWide()
+        var fv: CFTypeRef?
+        if AXUIElementCopyAttributeValue(sys, kAXFocusedUIElementAttribute as CFString, &fv) == .success, let f = fv {
+            let e = f as! AXUIElement
+            var names: CFArray?
+            AXUIElementCopyAttributeNames(e, &names)
+            var pnames: CFArray?
+            AXUIElementCopyParameterizedAttributeNames(e, &pnames)
+            var role: CFTypeRef?, sr: CFTypeRef?, rr: CFTypeRef?, tm: CFTypeRef?
+            AXUIElementCopyAttributeValue(e, kAXRoleAttribute as CFString, &role)
+            AXUIElementCopyAttributeValue(e, kAXSubroleAttribute as CFString, &sr)
+            let rangeOK = AXUIElementCopyAttributeValue(e, kAXSelectedTextRangeAttribute as CFString, &rr) == .success
+            let tmOK = AXUIElementCopyAttributeValue(e, "AXSelectedTextMarkerRange" as CFString, &tm) == .success
+            var bOK = "-"
+            if let t = tm {
+                var b: CFTypeRef?
+                bOK = "\(AXUIElementCopyParameterizedAttributeValue(e, "AXBoundsForTextMarkerRange" as CFString, t, &b).rawValue) \(b.map { "\($0)" } ?? "nil")"
+            }
+            out += "focused: role=\(role as? String ?? "-") sub=\(sr as? String ?? "-") range=\(rangeOK) markers=\(tmOK) markerBounds=\(bOK)\n"
+            out += "attrs: \((names as? [String] ?? []).joined(separator: ","))\n"
+            out += "param: \((pnames as? [String] ?? []).joined(separator: ","))\n"
+        }
+        out += "screen (\(win.text.count) chars, ocr=\(WindowContext.lastWasOCR), screenAllowed=\(ScreenText.allowed)):\n" + win.text + "\n"
+        let url = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Logs/ExoKey-context-\(app.bundleIdentifier ?? "app").txt")
+        try? out.write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    private var lastAnchor: (rect: CGRect, count: Int, pid: pid_t, at: Date)?
+    private func rememberAnchor(_ r: CGRect, count: Int) {
+        guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier else { return }
+        lastAnchor = (r, count, pid, Date())
+    }
+
+    private func fail(_ r0: String) -> Ctx? {
+        let r = r0 + " app=" + (NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")
         if r != lastReason {
-            Log.write("ai: skip \(r) app=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")")
+            Log.write("ai: skip \(r)")
         }
         lastReason = r
         return nil
     }
 
+    /// What may follow the caret on the line and still count as "typing at the end": spaces, invisible marks,
+    /// and closing characters — a quote or bracket the editor auto-closed, a placeholder line "____", final punctuation.
     private static let invisible = CharacterSet.whitespacesAndNewlines
         .union(CharacterSet(charactersIn: "\u{200B}\u{200C}\u{200D}\u{2060}\u{FEFF}\u{FFFC}\u{00A0}"))
+        .union(CharacterSet(charactersIn: "\"')]}»”’›_.,;:!?…"))
 
     private static func rect(_ v: CFTypeRef?) -> CGRect? {
         guard let v = v, CFGetTypeID(v) == AXValueGetTypeID() else { return nil }
@@ -259,9 +321,28 @@ final class Predictor {
         var loc = min(max(0, range.location), ns.length)
         // some Electron editors report the caret at 0 — assume typing at the end
         if loc == 0, ns.length > 0 { loc = ns.length }
-        let after = ns.substring(from: loc)
-        let restOfLine = after.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? ""
-        if !restOfLine.unicodeScalars.allSatisfy({ Self.invisible.contains($0) }) { return fail("text-after-caret") }
+        var after = ns.substring(from: loc)
+        var restOfLine = after.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? ""
+        if !restOfLine.unicodeScalars.allSatisfy({ Self.invisible.contains($0) }) {
+            // Electron/Chromium editors sometimes report the caret a few characters off: find what was just typed
+            let probe = String(recentTyped.suffix(12))
+            let fixed = probe.count >= 4 ? ns.range(of: probe, options: .backwards) : NSRange(location: NSNotFound, length: 0)
+            if fixed.location != NSNotFound {
+                loc = fixed.location + fixed.length
+                after = ns.substring(from: loc)
+                restOfLine = after.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? ""
+            }
+            if !restOfLine.unicodeScalars.allSatisfy({ Self.invisible.contains($0) }) {
+                // diagnostics without the text itself: kinds of the first characters after the caret
+                let kinds = restOfLine.unicodeScalars.prefix(4).map { u -> String in
+                    CharacterSet.letters.contains(u) ? "L" : CharacterSet.decimalDigits.contains(u) ? "D"
+                        : String(format: "U+%04X", u.value)
+                }.joined(separator: " ")
+                var role: CFTypeRef?
+                AXUIElementCopyAttributeValue(e, kAXRoleAttribute as CFString, &role)
+                return fail("text-after-caret [\(kinds)] probe=\(fixed.location != NSNotFound) len=\(restOfLine.count) role=\(role as? String ?? "-") value=\(ns.length) caret=\(loc) typed=\(recentTyped.count)")
+            }
+        }
         let start = max(0, loc - 2000)
         let text = ns.substring(with: NSRange(location: start, length: loc - start))
         lastFieldText = text
@@ -274,8 +355,23 @@ final class Predictor {
                 if AXUIElementCopyParameterizedAttributeValue(e, kAXBoundsForRangeParameterizedAttribute as CFString, rv, &b) == .success,
                    let rect = Self.rect(b) {
                     lastReason = ""
+                    rememberAnchor(rect, count: text.count)
                     return Ctx(text: text, anchor: rect, kind: .char)
                 }
+            }
+        }
+        // 1b) a character or two further back (some web editors give no box for a just-typed space)
+        for back in 2...3 where loc >= back {
+            let seg = ns.substring(with: NSRange(location: loc - back, length: back))
+            guard !seg.contains("\n") else { break }
+            var r = CFRange(location: loc - back, length: 1)
+            guard let rv = AXValueCreate(.cfRange, &r) else { break }
+            var b: CFTypeRef?
+            if AXUIElementCopyParameterizedAttributeValue(e, kAXBoundsForRangeParameterizedAttribute as CFString, rv, &b) == .success,
+               var rect = Self.rect(b) {
+                rect.origin.x = rect.maxX + CGFloat(back - 1) * rect.height * 0.4 - rect.width
+                lastReason = ""
+                return Ctx(text: text, anchor: rect, kind: .char)
             }
         }
         // 2) Chrome / Electron: text markers
@@ -287,6 +383,16 @@ final class Predictor {
                 lastReason = ""
                 return Ctx(text: text, anchor: rect, kind: .caret)
             }
+        }
+        // 2b) the page didn't answer this time (busy web apps time out): continue from the last good position
+        //     in the same field, shifted by the characters typed since
+        if let la = lastAnchor, la.pid == NSWorkspace.shared.frontmostApplication?.processIdentifier,
+           Date().timeIntervalSince(la.at) < 15, text.count >= la.count, text.count - la.count <= 40,
+           !text.suffix(text.count - la.count).contains("\n") {
+            var rect = la.rect
+            rect.origin.x += CGFloat(text.count - la.count) * la.rect.height * 0.45
+            lastReason = ""
+            return Ctx(text: text, anchor: rect, kind: .char)
         }
         // 3) fallback: small panel under the text field (off: users found it confusing)
         guard UserDefaults.standard.bool(forKey: "aiPanelFallback") else { return fail("no-caret") }
@@ -314,6 +420,8 @@ final class Predictor {
         let text = ctx.text
         guard text.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2,
               let lastChar = text.last, !lastChar.isNewline else { return }
+        // right after "?" the model tends to answer the question itself — nothing to suggest there
+        if text.trimmingCharacters(in: .whitespaces).hasSuffix("?") { return }
         let lang = LayoutManager.shared.currentLang ?? .en
         let partial = Self.currentWord(text)
         let s = Settings.shared
@@ -323,7 +431,49 @@ final class Predictor {
             present(applyNames(p, partial: partial, lang: lang), ctx, lang)
             return
         }
-        // 2) model
+        let debug = UserDefaults.standard.bool(forKey: "aiDebug")
+        let cotypist = s.aiConfidence == 3
+        // 1b) words and phrases from the conversation on screen ("gen" → "generator set", "external power" → "supply")
+        if s.aiWindowContext, let c = contextCompletion(text, partial: partial) {
+            if debug { Log.write("ai: answer from screen") }
+            present(applyNames(c, partial: partial, lang: lang), ctx, lang)
+            return
+        }
+        // 1c) the word being typed: the dictionary and the user's own words, not the model —
+        //     the model guesses word endings badly (half words, wrong case), the dictionary knows "пож" → "пожалуйста"
+        if !partial.isEmpty, useModel, partial.count >= 2 {
+            // The model rules out words that don't fit the sentence ("the same cond" → not "conduct", "condom"),
+            // the dictionary picks among the rest. Typing test: +1.4% saved, same share of right suggestions.
+            let cands = wordCandidates(partial, lang)
+            AIModel.shared.nextTokens(buildPrompt(draft: text, lang: lang)) { [weak self] toks in
+                guard let self = self, gen == self.generation else { return }
+                var out = self.filteredCompletion(partial, cands, toks, lang)
+                var src = "model+dictionary"
+                if out.isEmpty { out = self.dictCompletion(partial, lang, share: 0.65, ratio: 4); src = "dictionary" }
+                out = self.removeBanned(out, lang: lang)
+                if debug { Log.write("ai: answer \(out.isEmpty ? "none" : "word") from \(src)") }
+                guard !out.isEmpty else { return }
+                let r = self.applyNames(out, partial: partial, lang: lang)
+                if self.isVisible { if r != self.suggestion { self.suggestion = r; self.layout() } } else { self.present(r, ctx, lang) }
+            }
+            if !cotypist { return }
+        } else if !partial.isEmpty {
+            let out = removeBanned(dictCompletion(partial, lang), lang: lang)
+            if debug { Log.write("ai: answer \(out.isEmpty ? "none" : "word") from dictionary") }
+            if !out.isEmpty { present(applyNames(out, partial: partial, lang: lang), ctx, lang) }
+            // Tested and rejected (tools/test/typing_sim.py): letting the model pick the word form among dictionary
+            // words, or replace the dictionary word, gave no gain or more wrong suggestions — the model misspells
+            // endings ("expl" → "explenation"). The user's own words win over time instead.
+            // Exception: mode "like Cotypist" — the model leads everywhere, the dictionary only checks spelling.
+            if !(cotypist && useModel) { return }
+        }
+        // 1d) the user's own habit: the word they usually write after this one
+        if partial.isEmpty, let b = bigramNext(text, lang) {
+            if debug { Log.write("ai: answer from my word pairs") }
+            present(applyNames(b, partial: "", lang: lang), ctx, lang)
+            return
+        }
+        // 2) model: the next words, after a space
         if useModel {
             var prompt = text
             while prompt.last == " " { prompt.removeLast() }
@@ -337,7 +487,13 @@ final class Predictor {
                 var out = Self.extract(raw, afterSpace: afterSpace, midWord: !partial.isEmpty, maxWords: maxWords, cut: !done || cut)
                 out = self.preferUserWord(out, partial: partial, lang: lang)
                 out = self.removeBanned(out, lang: lang)
-                if done, out.isEmpty, !partial.isEmpty { out = self.dictCompletion(partial, lang) }
+                // spelling control: only words that exist (dictionary or the user's own) — the model misspells
+                out = self.knownWordsOnly(out, partial: partial, lang: lang, final: done)
+                if done, debug {
+                    Log.write("ai: answer \(out.isEmpty ? "none (unsure)" : "\(out.split(separator: " ").count) words") app=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")")
+                }
+                // no dictionary fallback here: the most frequent word for a prefix ("ко" → "конечно")
+                // is usually not the word the user is typing
                 out = self.applyNames(out, partial: partial, lang: lang)
                 guard !out.isEmpty, out.hasPrefix(self.consumed) else { return }
                 let rest = String(out.dropFirst(self.consumed.count))
@@ -354,13 +510,15 @@ final class Predictor {
     }
 
     /// Prompt = (style examples) + meaningful context above the field + the user's draft.
+    /// Plain text for a base model (chosen with tools/test/prompt_bench.py on real samples):
+    /// a few of the user's own messages, the text on screen (the conversation), then the draft.
     private func buildPrompt(draft: String, lang: Lang) -> String {
         let s = Settings.shared
         let app = NSWorkspace.shared.frontmostApplication
         var head = ""
-        let styles = s.aiLearnStyle ? StyleMemory.shared.examples(app: app?.bundleIdentifier, lang: lang, limit: 8) : []
+        let styles = s.aiLearnStyle ? StyleMemory.shared.examples(app: app?.bundleIdentifier, lang: lang, limit: 6) : []
         if !styles.isEmpty {
-            head += styles.map { "- " + $0 }.joined(separator: "\n") + "\n\n"
+            head += "How I write:\n" + styles.map { "- " + $0.replacingOccurrences(of: "\n", with: " ") }.joined(separator: "\n") + "\n\n"
         }
         var field = String(draft.suffix(1500))
         if s.aiWindowContext, let pid = app?.processIdentifier {
@@ -369,12 +527,11 @@ final class Predictor {
             // the field's own text may also be visible in the window — don't repeat it
             let probe = String(field.prefix(120))
             if probe.count > 10 { win = win.replacingOccurrences(of: probe, with: "") }
-            if !win.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                head += win + "\n"
-            }
+            win = String(win.suffix(2500)).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !win.isEmpty { head += "Screen:\n" + win + "\n\n" }
         }
         if field.isEmpty { field = draft }
-        let prompt = head + field
+        let prompt = head + "My message:\n" + field
         if UserDefaults.standard.bool(forKey: "aiDebug") {
             try? ("[\(app?.bundleIdentifier ?? "-")]\n" + prompt).write(
                 to: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/ExoKey-ai-prompt.txt"),
@@ -392,6 +549,9 @@ final class Predictor {
 
     private func present(_ s: String, _ ctx: Ctx, _ lang: Lang) {
         if !isVisible { Stats.add(.aiShown) }
+        if UserDefaults.standard.bool(forKey: "aiDebug"), !isVisible {
+            Log.write("ai: shown \(s.split(separator: " ").count) words at \(ctx.kind) x=\(Int(ctx.anchor.minX)) y=\(Int(ctx.anchor.minY)) h=\(Int(ctx.anchor.height)) app=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")")
+        }
         if Settings.shared.aiLearnStyle {
             let app = NSWorkspace.shared.frontmostApplication
             StyleMemory.shared.lastShown = StyleMemory.Shown(
@@ -422,6 +582,69 @@ final class Predictor {
             namePartial = ""
         }
         return first + nc.fixWords(String(rest), lang)
+    }
+
+    /// Completion copied from the text on screen (the conversation) or from earlier in the same field:
+    /// a word that starts with what is being typed, or the words that followed the same two words there.
+    private func contextCompletion(_ text: String, partial: String) -> String? {
+        guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier else { return nil }
+        let before = String(text.dropLast(partial.count))
+        let source = WindowContext.shared.context(for: pid).text + "\n" + String(before.suffix(3000))
+        struct Tok { let w: String; let lw: String; let breakBefore: Bool }
+        var toks: [Tok] = []
+        var gap = ""
+        var cur = ""
+        func flush() {
+            guard !cur.isEmpty else { return }
+            toks.append(Tok(w: cur, lw: cur.lowercased(), breakBefore: gap.contains { ".!?;:\n()[]\"«»".contains($0) }))
+            cur = ""; gap = ""
+        }
+        for ch in source {
+            if ch.isLetter || ch.isNumber || ch == "'" || ch == "’" || (ch == "-" && !cur.isEmpty) { cur.append(ch) }
+            else { flush(); gap.append(ch) }
+        }
+        flush()
+        if UserDefaults.standard.bool(forKey: "aiDebug") {
+            Log.write("ai: screen words \(toks.count), screen chars \(WindowContext.shared.context(for: pid).text.count)")
+        }
+        guard toks.count > 2 else { return nil }
+        let typedWords = before.split { !($0.isLetter || $0.isNumber || $0 == "'" || $0 == "’" || $0 == "-") }.map { $0.lowercased() }
+        let prev1 = typedWords.last, prev2 = typedWords.count > 1 ? typedWords[typedWords.count - 2] : nil
+        let sentenceStart = before.trimmingCharacters(in: .whitespaces).last.map { ".!?\n".contains($0) } ?? true
+
+        // words that follow position i in the source, until punctuation (max n)
+        func follow(_ i: Int, _ n: Int) -> String {
+            var out: [String] = []
+            var j = i + 1
+            while j < toks.count, out.count < n, !toks[j].breakBefore { out.append(toks[j].w); j += 1 }
+            return out.joined(separator: " ")
+        }
+        if !partial.isEmpty {
+            let pl = partial.lowercased()
+            guard pl.count >= 2 else { return nil }
+            var best: (score: Int, i: Int)?
+            for (i, t) in toks.enumerated() where t.lw.count >= max(4, pl.count + 2) && t.lw.hasPrefix(pl) {
+                var score = i                                    // later = closer to the field
+                if let p = prev1, i > 0, toks[i - 1].lw == p, !t.breakBefore { score += 100_000 }
+                if best == nil || score >= best!.score { best = (score, i) }
+            }
+            guard let b = best else { return nil }
+            let word = toks[b.i].w
+            var rest = String(word.dropFirst(partial.count))
+            // the phrase around it matched too: offer the next words as well
+            if b.score >= 100_000 { let more = follow(b.i, 3); if !more.isEmpty { rest += " " + more } }
+            return rest.isEmpty ? nil : rest
+        }
+        // after a space: the same two words (or one long word) appeared on screen — offer what followed them
+        guard !sentenceStart, let p1 = prev1, text.last == " " else { return nil }
+        for i in stride(from: toks.count - 1, through: 0, by: -1) where toks[i].lw == p1 {
+            let matched: Bool
+            if let p2 = prev2 { matched = i > 0 && toks[i - 1].lw == p2 && !toks[i].breakBefore } else { matched = p1.count >= 5 }
+            guard matched else { continue }
+            let more = follow(i, 4)
+            if !more.isEmpty { return more }          // the user's own words at the very end have nothing after them
+        }
+        return nil
     }
 
     static func currentWord(_ text: String) -> String {
@@ -460,13 +683,116 @@ final class Predictor {
         return removeBanned(b.rest, lang: lang).isEmpty ? nil : b.rest
     }
 
-    private func dictCompletion(_ partial: String, _ lang: Lang) -> String {
+    private func isKnownWord(_ w: String, _ lang: Lang) -> Bool {
+        let low = TextNorm.normalize(w, lang)
+        guard low.count > 1 else { return true }
+        if (Engine.shared.dicts[lang]?.freq(low) ?? 0) > 0 { return true }
+        for l in Lang.allCases where l != lang { if (Engine.shared.dicts[l]?.freq(low) ?? 0) > 0 { return true } }
+        return UserStore.shared.count("uw:\(lang.rawValue):\(low)") > 0 || UserStore.shared.isWord(low, lang)
+    }
+
+    /// Cuts a suggestion before its first misspelled word. The first word is checked together with what is typed
+    /// of it ("соотв" + "етствуют"); a word still being streamed is checked when complete.
+    private func knownWordsOnly(_ s: String, partial: String, lang: Lang, final: Bool) -> String {
+        var out = ""
+        var word = partial
+        var pending = ""
+        for ch in s {
+            if ch.isLetter || ch == "'" || ch == "’" || ch == "-" {
+                word.append(ch); pending.append(ch)
+            } else {
+                if !word.isEmpty {
+                    guard isKnownWord(word, lang) else { return out }
+                    out += pending
+                }
+                word = ""; pending = ""
+                out.append(ch)
+            }
+        }
+        if !pending.isEmpty, !final || isKnownWord(word, lang) { out += pending }
+        return out
+    }
+
+    /// After a space: the word this user wrote after the previous word at least twice, more often than anything else.
+    private func bigramNext(_ text: String, _ lang: Lang) -> String? {
+        guard text.last == " " else { return nil }
+        let words = text.split { !($0.isLetter || $0 == "-" || $0 == "'") }
+        guard let lastW = words.last, !".!?".contains(text.trimmingCharacters(in: .whitespaces).last ?? ".") else { return nil }
+        let prev = TextNorm.normalize(String(lastW), lang)
+        let next = UserStore.shared.counts(withPrefix: "ub:\(lang.rawValue):\(prev) ")
+        let total = next.reduce(0) { $0 + $1.count }
+        guard let top = next.max(by: { $0.count < $1.count }), top.count >= 2, Double(top.count) / Double(total) >= 0.5 else { return nil }
+        return top.rest
+    }
+
+    /// The current word, completed from the user's own words and the frequency dictionary — only when one word
+    /// clearly dominates among all words with this beginning ("пож" → "алуйста"). Checked with tools/test/typing_sim.py.
+    /// Dictionary words (and the user's own) that start with the partial word, with frequencies.
+    private func wordCandidates(_ partial: String, _ lang: Lang) -> [(word: String, f: Int)] {
+        let low = TextNorm.normalize(partial, lang)
+        var c: [String: Int] = [:]
+        for w in Engine.shared.dicts[lang]?.topK(low, k: 12) ?? [] { c[w.word] = w.freq }
+        for (w, n) in UserStore.shared.typedWordCompletions(low, lang) where w.count > low.count { c[w, default: 0] += n * 200_000 }
+        for w in UserStore.shared.userCompletions(low, lang) { c[w, default: 0] += 1_000_000 }
+        return c.map { ($0.key, $0.value) }
+    }
+
+    /// Frequency × how much the model supports the word's continuation; shown only if one word clearly wins.
+    private func filteredCompletion(_ partial: String, _ cands: [(word: String, f: Int)], _ toks: [(token: String, p: Double)], _ lang: Lang) -> String {
+        guard !cands.isEmpty, !toks.isEmpty else { return "" }
+        let low = TextNorm.normalize(partial, lang)
+        var scored: [(String, Double)] = cands.map { c in
+            let rest = String(c.word.dropFirst(low.count))
+            let m = toks.reduce(0.0) { acc, t in
+                let tk = t.token.lowercased()
+                return !tk.isEmpty && rest.hasPrefix(tk) ? acc + t.p : acc
+            }
+            return (c.word, Double(c.f) * (m + 0.01))
+        }
+        scored.sort { $0.1 > $1.1 }
+        let total = scored.reduce(0) { $0 + $1.1 }
+        guard total > 0, let top = scored.first else { return "" }
+        let second = scored.count > 1 ? scored[1].1 : 0
+        let share = top.1 / total
+        guard share >= 0.65 || (second > 0 && top.1 >= 4 * second && share >= 0.325) else { return "" }
+        var rest = String(top.0.dropFirst(low.count))
+        if partial.uppercased() == partial, partial.count > 1 { rest = rest.uppercased() }
+        return rest
+    }
+
+    private func dictCompletion(_ partial: String, _ lang: Lang, share minShare: Double = 0.5, ratio: Int = 3) -> String {
         guard partial.count >= 2 else { return "" }
         let low = TextNorm.normalize(partial, lang)
-        var word = UserStore.shared.userCompletions(low, lang).first
-        if word == nil, let d = Engine.shared.dicts[lang]?.bestCompletion(low), d.freq >= 20 { word = d.word }
-        guard let w = word, w.count > low.count else { return "" }
-        var rest = String(w.dropFirst(low.count))
+        guard let d = Engine.shared.dicts[lang] else { return "" }
+        let dictTotal = max(0, d.prefixFreq(low) - d.freq(low))
+        var cands: [String: Int] = [:]
+        var second = 0
+        if let t = d.topCompletions(low) { cands[t.word] = t.f1; second = t.f2 }
+        var userTotal = 0
+        for (w, n) in UserStore.shared.typedWordCompletions(low, lang) where w.count > low.count {
+            cands[w, default: 0] += n * 200_000; userTotal += n * 200_000
+        }
+        for w in UserStore.shared.userCompletions(low, lang) { cands[w, default: 0] += 1_000_000; userTotal += 1_000_000 }
+        let ranked = cands.sorted { $0.value > $1.value }
+        guard let top = ranked.first else { return "" }
+        let f2 = max(second, ranked.count > 1 ? ranked[1].value : 0)
+        let total = Double(max(1, dictTotal + userTotal))
+        let share = Double(top.value) / total
+        guard share >= minShare || (f2 > 0 && top.value >= ratio * f2 && share >= minShare / 2) || f2 == 0 && top.value >= 50 else {
+            // no single form wins ("соотв" → -ует / -ии / -енно): offer the part the likely forms share ("етств"),
+            // the ending is the user's (typing test: +1.6% saved, same share of right suggestions)
+            var mass = 0
+            var group: [String] = []
+            for w in d.topK(low, k: 12) {
+                group.append(w.word); mass += w.freq
+                if Double(mass) / total >= 0.6 { break }
+            }
+            guard Double(mass) / total >= 0.6, var stem = group.first else { return "" }
+            for w in group.dropFirst() { while !w.hasPrefix(stem) { stem.removeLast() } }
+            guard stem.count - low.count >= 3 else { return "" }
+            return String(stem.dropFirst(low.count))
+        }
+        var rest = String(top.key.dropFirst(low.count))
         if partial.uppercased() == partial, partial.count > 1 { rest = rest.uppercased() }
         return rest
     }
