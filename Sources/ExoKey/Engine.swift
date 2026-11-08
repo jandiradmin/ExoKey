@@ -43,6 +43,15 @@ final class Engine {
     var continuesWord = false
 
     /// Up to `n` characters before the caret (Accessibility; nil if the app doesn't tell).
+    /// The whole word before the caret, if the app's text really ends with what ExoKey saw typed (Electron apps
+    /// report the caret a few characters off — then nil).
+    static func wordBeforeCaret(endingWith typed: String) -> String? {
+        guard !typed.isEmpty, let before = textBeforeCaret(40) else { return nil }
+        let w = String(before.reversed().prefix { $0.isLetter || $0 == "'" || $0 == "’" || $0 == "-" }.reversed())
+        guard w.count > typed.count, w.hasSuffix(typed), w.first?.isLetter == true else { return nil }
+        return w
+    }
+
     static func textBeforeCaret(_ n: Int) -> String? {
         let sys = AXUIElementCreateSystemWide()
         AXUIElementSetMessagingTimeout(sys, 0.05)
@@ -99,9 +108,17 @@ final class Engine {
             if external, self.correction != nil || self.last?.correction != nil || self.erasedSinceSpace {
                 self.holdUntilSpace = true
             }
+            Log.write("layout -> \(self.layouts.currentLang?.rawValue ?? self.layouts.currentID) \(external ? "by the user/system" : "by ExoKey") midWord=\(!self.keys.isEmpty)")
             if external, !self.keys.isEmpty {
-                // user switched layout by hand in the middle of a word — leave it alone
+                // switched in the middle of a word (by hand, Caps Lock, a system shortcut): stop guessing this word,
+                // but remember where — letters of one word in two scripts ("прите" + "ypbb") get put back (see appendLetter)
+                if self.switchAt == nil, let from = self.screenLang {
+                    self.switchAt = self.keys.count
+                    self.switchFrom = from
+                    self.disabledBeforeSwitch = self.disabled
+                }
                 self.disabled = true
+                self.continuation = false
                 self.correction = nil
             }
             self.onStateChange?()
@@ -141,9 +158,25 @@ final class Engine {
         resetWord()
         last = nil
         convertCycle = []
+        erasedSinceSpace = false      // a click / another field / app: earlier backspaces say nothing about the next word
+        continuesWord = false
     }
 
+    /// Layout switched outside ExoKey in the middle of the current word: key index and the layout before it.
+    private var switchAt: Int?
+    private var switchFrom: Lang?
+    private var disabledBeforeSwitch = false
+    /// The word continues text ExoKey didn't see typed (layout fixes are off for it, spelling checks the whole word).
+    private var continuation = false
+    /// The word started right after backspaces: a short piece ("ть", "ие") is not judged as a word of its own.
+    private var startedAfterErase = false
+    private var shortPieceAfterErase: Bool { startedAfterErase && keys.count < 4 }
+
     private func resetWord() {
+        switchAt = nil
+        switchFrom = nil
+        continuation = false
+        startedAfterErase = false
         keys = []
         screenLang = nil
         disabled = false
@@ -225,6 +258,9 @@ final class Engine {
         }
         // Autocomplete keys (TZ §13.3)
         let pred = Predictor.shared
+        if code == 48, UserDefaults.standard.bool(forKey: "aiDebug") {
+            Log.write("tab: ghost=\(pred.isVisible) mods=\(flags.intersection(Hotkey.relevant).rawValue) acceptWord=\(settings.hkAcceptWord.keyCode)/\(settings.hkAcceptWord.mods) spellOffer=\(SpellFix.shared.isOffering)")
+        }
         if settings.hkToggleAI.matches(code: code, flags: flags) {
             settings.aiEnabled.toggle()
             if settings.aiEnabled { AIModel.shared.start() } else { AIModel.shared.stop(); pred.hide() }
@@ -255,6 +291,9 @@ final class Engine {
             Log.write("key #\(keyCount) enabled=\(settings.enabled) excluded=\(excludedApp) secure=\(IsSecureEventInputEnabled()) layout=\(layouts.currentID) lang=\(layouts.currentLang?.rawValue ?? "nil")")
         }
         guard settings.enabled, !excludedApp, !IsSecureEventInputEnabled() else { reset(); return .pass }
+        // the system's layout switch shortcut (⌃Space…) doesn't edit text: keep the word — the switch itself is
+        // handled when macOS reports it (in the middle of a word: no more guessing for it)
+        if layouts.isSwitchShortcut(code: Int64(code), flags: flags) { return .pass }
         if !flags.intersection([.maskCommand, .maskControl, .maskAlternate]).isEmpty {
             // ⌥⌫ / ⌘⌫ right after a fix: the user erased our word — don't fix the retyped word again until a space
             if code == 51, (correction.map { !$0.manual } ?? false) || (keys.isEmpty && (last?.correction.map { !$0.manual } ?? false)) {
@@ -301,8 +340,11 @@ final class Engine {
             // After "@", ".", "/", ":" — maybe an address; after a click, arrows, backspace or an inserted suggestion —
             // maybe the middle of a word: then look at the text before the caret.
             let fresh = lastBoundary.map { $0 == " " || $0 == "\n" || $0 == "\t" } ?? false
+            // backspace erased the word (and maybe more) — the next letters are often the rest of a word still on screen
+            startedAfterErase = lastBoundary == nil && erasedSinceSpace
             if continuesWord {
                 disabled = true
+                continuation = true
             } else if !fresh {
                 let before = Self.textBeforeCaret(60)
                 let addressish = lastBoundary.map { "@./:".contains($0) } ?? true
@@ -310,10 +352,13 @@ final class Engine {
                 // (Electron apps like Claude report the caret a few characters off — then: unknown, fix as usual)
                 let probe = String(Predictor.shared.recentTypedTail.suffix(3))
                 let verified = probe.count >= 2 && (before?.hasSuffix(probe) ?? false)
+                // erased back to a space / the start of the field: a really new word, not the rest of an old one
+                if startedAfterErase, let b = before, b.last.map({ $0.isWhitespace }) ?? true { startedAfterErase = false }
                 if (lastBoundary == nil && verified && (before?.last?.isLetter ?? false))
                     || (addressish && before.map(Self.inAddress) == true) {
                     disabled = true
-                    Log.write("word continues existing text or an address: no layout fix")
+                    continuation = !(addressish && before.map(Self.inAddress) == true)
+                    Log.write("word continues existing text or an address: no layout fix" + Log.words(String((before ?? "").suffix(20))))
                 }
             }
             continuesWord = false
@@ -396,10 +441,15 @@ final class Engine {
         keys.append(ks)
         convertCycle = []
         if keys.count > 40 { disabled = true }
-        guard !disabled, !holdUntilSpace, corrections < 2, keys.count >= settings.minLetters else { return .pass }
+        if restoreMixedScript() { return .swallow }
+        // After backspaces into existing text the letters are usually the rest of a word still on screen: what ExoKey
+        // remembers typing no longer matches the screen (its own fixes, Electron/WeChat carets), so the piece can't be
+        // judged while typing ("прив" + "ет" flipped to EN). The finished word is still checked at the space.
+        guard !disabled, !holdUntilSpace, corrections < 2, keys.count >= settings.minLetters, !startedAfterErase else { return .pass }
         if let d = decideMidWord() {
+            let was = screenLang.flatMap { layouts.layouts[$0]?.text(keys) } ?? ""
             apply(to: d, typedSoFarExcludingLast: true, manual: false)
-            Log.write("mid fix len=\(keys.count) -> \(d.rawValue)")
+            Log.write("mid fix len=\(keys.count) -> \(d.rawValue)" + Log.words("\(was) → \(layouts.layouts[d]?.text(keys) ?? "")"))
             return .swallow
         }
         return .pass
@@ -418,9 +468,10 @@ final class Engine {
                let fromL = layouts.layouts[c.from], !correctionKeys.isEmpty {
                 // user erased the word we corrected — treat as undo
                 recordUndo(c, original: TextNorm.normalize(fromL.text(correctionKeys), c.from))
-                Log.write("implicit undo")
+                Log.write("implicit undo" + Log.words(fromL.text(correctionKeys)))
             }
             keys.removeLast()
+            if let a = switchAt, keys.count <= a { switchAt = nil; switchFrom = nil }   // the switched part is erased
             if keys.isEmpty { resetWord() }
         }
         convertCycle = []
@@ -438,7 +489,7 @@ final class Engine {
         }
         defer {
             convertCycle = []
-            if kind != .symbol { holdUntilSpace = false; erasedSinceSpace = false }
+            if kind != .symbol { holdUntilSpace = false; erasedSinceSpace = false; continuesWord = false }
         }
         guard !keys.isEmpty, let screen = screenLang else {
             resetWord(); last = nil
@@ -446,10 +497,15 @@ final class Engine {
         }
         var result = Result.pass
         if let ch = cur.char(ks), ".!?\r\n".contains(ch) || code(ks) == 36 { pendingSentenceEnd = true }
-        if !disabled, !holdUntilSpace, let target = decideFinal() {
+        // debug: a word that looks like the wrong layout but was left as typed — and why ("lkz" stayed for "для")
+        if disabled || holdUntilSpace || shortPieceAfterErase, !keys.isEmpty, let would = decideFinal() {
+            Log.write("final skip len=\(keys.count) \(screenLang?.rawValue ?? "-")->\(would.rawValue)" + Log.words(screenLang.flatMap { layouts.layouts[$0]?.text(keys) } ?? "") + " disabled=\(disabled) continuation=\(continuation) hold=\(holdUntilSpace) afterErase=\(startedAfterErase) corrections=\(corrections) app=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")")
+        }
+        if !disabled, !holdUntilSpace, !shortPieceAfterErase, let target = decideFinal() {
             let boundaryChar = cur.char(ks) ?? ""
+            let was = screenLang.flatMap { layouts.layouts[$0]?.text(keys) } ?? ""
             apply(to: target, typedSoFarExcludingLast: false, manual: false, capitalize: shouldCapitalize(target))
-            Log.write("final fix len=\(keys.count) -> \(target.rawValue)")
+            Log.write("final fix len=\(keys.count) -> \(target.rawValue)" + Log.words("\(was) → \(layouts.layouts[target]?.text(keys) ?? "")"))
             switch kind {
             case .space, .control: Injector.repost(event)
             case .symbol: Injector.type(boundaryChar)
@@ -468,6 +524,10 @@ final class Engine {
             learnUnknown(screen)
             if kind != .control, !disabled, let l = layouts.layouts[screen], !untouchableCase(keys, final: true) {
                 SpellFix.shared.wordFinished(l.text(keys), lang: screen, boundary: cur.char(ks) ?? "")
+            } else if kind != .control, continuation, let l = layouts.layouts[screen], !untouchableCase(keys, final: true),
+                      let w = Self.wordBeforeCaret(endingWith: l.text(keys)) {
+                // the word continues text typed earlier (after a suggestion, backspace, a click): check the whole word
+                SpellFix.shared.wordFinished(w, lang: screen, boundary: cur.char(ks) ?? "")
             }
         }
         finishWord(endedWithSpace: kind == .space)
@@ -636,6 +696,10 @@ final class Engine {
         let oText = core(keys, o)
         guard keys.count >= settings.minLetters, !store.isException(oText, o) else { return nil }
         let pO = prefixScore(oText, o)
+        // The previous word is in this language and this beginning exists in it: the user is writing in this
+        // language — a few letters are no evidence against it ("the" + "nt" is not "те"). Decide at the end of the
+        // word, when the whole word is known; flip mid-word only if this beginning is impossible here.
+        if pO > 0, let p = prevWordLang, p == o { return nil }
         let alts = alternatives(keys, excluding: o, score: prefixScore, minScore: minAltPrefix)
         guard let best = alts.first else { return nil }
         if pO > 0 && best.score < pO * midRatio { return nil }
@@ -668,6 +732,30 @@ final class Engine {
             guard keys.count >= 2, strong || (ctx && fO == 0 && best.score >= 500) else { return nil }
         }
         return pick(alts)
+    }
+
+    /// One word typed in two scripts because the layout changed in the middle of it ("прите" + "ypbb" after
+    /// Caps Lock / a system shortcut): nobody means that — type the rest in the word's layout and switch back.
+    /// The last key has not reached the app yet (the caller swallows it), so it is typed here too.
+    private func restoreMixedScript() -> Bool {
+        guard let at = switchAt, let from = switchFrom, !holdUntilSpace, keys.count - at >= 2,
+              let cur = layouts.current, cur.lang.isCyrillic != from.isCyrillic, let fromL = layouts.layouts[from] else { return false }
+        let head = Array(keys[..<at]), tail = Array(keys[at...])
+        let headText = fromL.text(head), tailCur = cur.text(tail)
+        guard headText.count >= 2, headText.allSatisfy({ TextNorm.isLetter($0, from) }),
+              tailCur.allSatisfy({ TextNorm.isLetter($0, cur.lang) }) else { return false }
+        layouts.select(from)
+        Injector.backspaces(tailCur.count - 1)           // the last letter was not delivered yet
+        Injector.type(fromL.text(tail))
+        screenLang = from
+        switchAt = nil
+        switchFrom = nil
+        disabled = disabledBeforeSwitch
+        correction = Correction(from: cur.lang, to: from, manual: false)
+        correctionKeys = keys
+        Log.write("mixed scripts in one word: rest retyped in \(from.rawValue) len=\(tail.count)" + Log.words("\(headText)+\(tailCur) → \(fromL.text(keys))"))
+        onStateChange?()
+        return true
     }
 
     // MARK: - Applying

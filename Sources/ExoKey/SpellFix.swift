@@ -104,12 +104,12 @@ final class SpellFix {
                     guard after.isEmpty else { return }          // the user already typed on: don't touch
                     self.replace(orig: typed, fix: fix, boundary: boundary)
                     Stats.add(.spellAccepted)
-                    Log.write("spell: auto")
+                    Log.write("spell: auto" + Log.words("\(typed) → \(fix)"))
                 } else {
                     self.offer = (typed, fix, boundary)
                     let placed = self.showPanel(fix)
                     Stats.add(.spellShown)
-                    Log.write("spell: offered (\(placed)) app=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")")
+                    Log.write("spell: offered (\(placed))" + Log.words("\(typed) → \(fix)") + " app=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")")
                 }
             }
         }
@@ -163,7 +163,7 @@ final class SpellFix {
         applied = (o.orig, o.fix, o.boundary)
         keysSinceApply = 0
         Stats.add(.spellAccepted)
-        Log.write("spell: accepted")
+        Log.write("spell: accepted" + Log.words("\(o.orig) → \(o.fix)"))
     }
 
     private func replace(orig: String, fix: String, boundary: String) {

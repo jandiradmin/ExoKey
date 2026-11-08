@@ -117,7 +117,11 @@ final class Predictor {
         timer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in self?.request() }
     }
 
-    func hide() {
+    func hide(file: String = #fileID, line: Int = #line) {
+        // debug: who removes a suggestion that is on screen ("after Tab the suggestion disappears")
+        if isVisible, UserDefaults.standard.bool(forKey: "aiDebug") {
+            Log.write("ai: hidden by \(file.split(separator: "/").last ?? ""):\(line) len=\(suggestion.count)" + Log.words(suggestion))
+        }
         timer?.invalidate()
         streamTask?.cancel()
         streamTask = nil
@@ -154,16 +158,18 @@ final class Predictor {
             let onScreen = namePartial + consumed.prefix { $0.isLetter || $0 == "-" || $0 == "'" }
             Injector.backspaces(onScreen.count)
             Injector.type(NameCase.capitalize(onScreen))
+            noteInserted(NameCase.capitalize(onScreen), erased: onScreen.count)
             namePartial = ""
         }
         Injector.type(part)
+        noteInserted(part)
         lastInsertedChar = part.last
         if let last = part.last, last.isLetter { Engine.shared.continuesWord = true }   // "калькулятор|" + "ом"
         lastInsert = part
         lastInsertLang = suggestionLang
         keysSinceInsert = 0
         recordAccept(part)
-        Log.write("ai: accepted \(all ? "all" : "word")")
+        Log.write("ai: accepted \(all ? "all" : "word")" + Log.words(part))
         if part == suggestion {
             hide()
             // the app needs a moment to show the inserted text: asking right away read the old caret position
@@ -171,8 +177,15 @@ final class Predictor {
             schedule(extraDelay: 0.3)
         } else {
             suggestion.removeFirst(part.count)
+            consumed += part        // the stream keeps coming: don't bring the accepted word back
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in self?.reposition() }
         }
+    }
+
+    /// Text we inserted is "just typed" too: readContext finds the caret by it (Electron reports the caret off),
+    /// otherwise the accepted word looked like text after the caret and the rest of the suggestion vanished.
+    private func noteInserted(_ s: String, erased: Int = 0) {
+        recentTyped = String((String(recentTyped.dropLast(erased)) + s).suffix(40))
     }
 
     /// Removes the text inserted by the last acceptance, only if nothing was typed after it.
@@ -210,10 +223,9 @@ final class Predictor {
         guard !k.isEmpty else { return }
         let n = UserStore.shared.bump("rej:\(lastInsertLang.rawValue):\(k)")
         if let p = UserStore.shared.find(.phrase, lastInsertLang, k), p.source != .manual { UserStore.shared.delete(p) }
-        if n >= 2, UserStore.shared.find(.banned, lastInsertLang, k) == nil {
-            UserStore.shared.upsert(UserEntry(word: k, lang: lastInsertLang, kind: .banned, source: .learned))
-            Log.write("ai: banned learned")
-        }
+        _ = n
+        // No automatic bans: erasing a suggestion says nothing reliable about it, and learned bans ("т", "и", "the")
+        // cut almost every suggestion. Only words the user bans by hand in the Dictionary window are removed.
     }
 
     // MARK: Accessibility
@@ -425,55 +437,16 @@ final class Predictor {
         let lang = LayoutManager.shared.currentLang ?? .en
         let partial = Self.currentWord(text)
         let s = Settings.shared
+        let debug = UserDefaults.standard.bool(forKey: "aiDebug")
 
         // 1) saved phrases
         if s.aiPhrases, s.aiPersonalization, let p = phraseCompletion(text, lang) {
             present(applyNames(p, partial: partial, lang: lang), ctx, lang)
             return
         }
-        let debug = UserDefaults.standard.bool(forKey: "aiDebug")
-        let cotypist = s.aiConfidence == 3
-        // 1b) words and phrases from the conversation on screen ("gen" → "generator set", "external power" → "supply")
-        if s.aiWindowContext, let c = contextCompletion(text, partial: partial) {
-            if debug { Log.write("ai: answer from screen") }
-            present(applyNames(c, partial: partial, lang: lang), ctx, lang)
-            return
-        }
-        // 1c) the word being typed: the dictionary and the user's own words, not the model —
-        //     the model guesses word endings badly (half words, wrong case), the dictionary knows "пож" → "пожалуйста"
-        if !partial.isEmpty, useModel, partial.count >= 2 {
-            // The model rules out words that don't fit the sentence ("the same cond" → not "conduct", "condom"),
-            // the dictionary picks among the rest. Typing test: +1.4% saved, same share of right suggestions.
-            let cands = wordCandidates(partial, lang)
-            AIModel.shared.nextTokens(buildPrompt(draft: text, lang: lang)) { [weak self] toks in
-                guard let self = self, gen == self.generation else { return }
-                var out = self.filteredCompletion(partial, cands, toks, lang)
-                var src = "model+dictionary"
-                if out.isEmpty { out = self.dictCompletion(partial, lang, share: 0.65, ratio: 4); src = "dictionary" }
-                out = self.removeBanned(out, lang: lang)
-                if debug { Log.write("ai: answer \(out.isEmpty ? "none" : "word") from \(src)") }
-                guard !out.isEmpty else { return }
-                let r = self.applyNames(out, partial: partial, lang: lang)
-                if self.isVisible { if r != self.suggestion { self.suggestion = r; self.layout() } } else { self.present(r, ctx, lang) }
-            }
-            if !cotypist { return }
-        } else if !partial.isEmpty {
-            let out = removeBanned(dictCompletion(partial, lang), lang: lang)
-            if debug { Log.write("ai: answer \(out.isEmpty ? "none" : "word") from dictionary") }
-            if !out.isEmpty { present(applyNames(out, partial: partial, lang: lang), ctx, lang) }
-            // Tested and rejected (tools/test/typing_sim.py): letting the model pick the word form among dictionary
-            // words, or replace the dictionary word, gave no gain or more wrong suggestions — the model misspells
-            // endings ("expl" → "explenation"). The user's own words win over time instead.
-            // Exception: mode "like Cotypist" — the model leads everywhere, the dictionary only checks spelling.
-            if !(cotypist && useModel) { return }
-        }
-        // 1d) the user's own habit: the word they usually write after this one
-        if partial.isEmpty, let b = bigramNext(text, lang) {
-            if debug { Log.write("ai: answer from my word pairs") }
-            present(applyNames(b, partial: "", lang: lang), ctx, lang)
-            return
-        }
-        // 2) model: the next words, after a space
+        // 2) the model leads, as in the early versions: it finishes the current word AND continues the phrase.
+        //    The dictionary only cuts misspelled words. When the model has nothing, whole words from the screen,
+        //    the dictionary or the user's habits fill in.
         if useModel {
             var prompt = text
             while prompt.last == " " { prompt.removeLast() }
@@ -481,32 +454,68 @@ final class Predictor {
             let afterSpace = lastChar == " "
             let maxWords = s.aiPhrases ? max(1, s.aiMaxWords) : 1
             consumed = ""
+            let seen = seenWords(text)
             streamTask = AIModel.shared.stream(prompt, maxTokens: min(48, 4 + maxWords * 3)) { [weak self] raw, done, cut in
                 guard let self = self, gen == self.generation else { return }
                 // while streaming the last word may be unfinished
                 var out = Self.extract(raw, afterSpace: afterSpace, midWord: !partial.isEmpty, maxWords: maxWords, cut: !done || cut)
                 out = self.preferUserWord(out, partial: partial, lang: lang)
-                out = self.removeBanned(out, lang: lang)
-                // spelling control: only words that exist (dictionary or the user's own) — the model misspells
-                out = self.knownWordsOnly(out, partial: partial, lang: lang, final: done)
-                if done, debug {
-                    Log.write("ai: answer \(out.isEmpty ? "none (unsure)" : "\(out.split(separator: " ").count) words") app=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")")
+                out = self.removeBanned(out, partial: partial, lang: lang)
+                out = self.knownWordsOnly(out, partial: partial, lang: lang, final: done, seen: seen)   // spelling control
+                if done, out.isEmpty, let f = self.fallback(text, partial: partial, lang: lang) {
+                    out = f
+                    if debug { Log.write("ai: model had nothing, fallback word") }
+                } else if done, debug {
+                    Log.write("ai: answer \(out.isEmpty ? "none" : "\(out.split(separator: " ").count) words")" + Log.words("\(partial)|\(out) model=\(raw)") + " app=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")")
                 }
-                // no dictionary fallback here: the most frequent word for a prefix ("ко" → "конечно")
-                // is usually not the word the user is typing
                 out = self.applyNames(out, partial: partial, lang: lang)
-                guard !out.isEmpty, out.hasPrefix(self.consumed) else { return }
+                // the final answer may reject what an earlier streamed piece already showed — don't leave it on screen
+                let dropShown = { if done, self.isVisible { self.hide() } }
+                if Self.repeatsTyped(out, text: text, partial: partial) {
+                    if done, debug { Log.write("ai: suggestion repeats what was just typed — dropped") }
+                    dropShown()
+                    return
+                }
+                guard !out.isEmpty, out.hasPrefix(self.consumed) else { dropShown(); return }
                 let rest = String(out.dropFirst(self.consumed.count))
-                guard !rest.isEmpty, rest != self.suggestion else { return }
+                guard !rest.isEmpty else { dropShown(); return }
+                guard rest != self.suggestion else { return }
                 if self.isVisible { self.suggestion = rest; self.layout() } else { self.present(rest, ctx, lang) }
             }
             return
         }
-        // 3) light mode: complete the current word from dictionaries
-        if !partial.isEmpty {
-            let out = removeBanned(dictCompletion(partial, lang), lang: lang)
-            if !out.isEmpty { present(applyNames(out, partial: partial, lang: lang), ctx, lang) }
+        // 3) light mode (no model): screen words, dictionary, habits
+        if let f = fallback(text, partial: partial, lang: lang) { present(applyNames(f, partial: partial, lang: lang), ctx, lang) }
+    }
+
+    /// The suggestion just repeats the user's last words ("пока не нужно" + "пока не нужно", "нужно" + "нужно"):
+    /// models copy text they see on screen or in the draft.
+    static func repeatsTyped(_ s: String, text: String, partial: String) -> Bool {
+        let wordsOf: (String) -> [String] = { $0.lowercased().split { !($0.isLetter || $0.isNumber || $0 == "'" || $0 == "-") }.map(String.init) }
+        var sug = wordsOf(s)
+        guard !sug.isEmpty else { return false }
+        var typed = wordsOf(text)
+        // the word being typed is completed by the suggestion (only when the suggestion continues it, not ", нужно")
+        if !partial.isEmpty, !typed.isEmpty, s.first?.isLetter == true {
+            typed.removeLast()
+            sug[0] = partial.lowercased() + sug[0]
         }
+        let n = min(sug.count, 4)
+        guard typed.count >= n else { return false }
+        if Array(typed.suffix(n)) == Array(sug.prefix(n)) { return true }
+        // the next word equals the last typed word ("нужно нужно")
+        return sug.first == typed.last && (sug.first?.count ?? 0) > 2
+    }
+
+    /// Whole words only (never a piece of a word): from the conversation on screen, the dictionary when one word
+    /// clearly dominates, or the word the user usually writes next.
+    private func fallback(_ text: String, partial: String, lang: Lang) -> String? {
+        if Settings.shared.aiWindowContext, let c = contextCompletion(text, partial: partial) { return c }
+        if !partial.isEmpty {
+            let d = removeBanned(dictCompletion(partial, lang), partial: partial, lang: lang)
+            return d.isEmpty ? nil : d
+        }
+        return bigramNext(text, lang)
     }
 
     /// Prompt = (style examples) + meaningful context above the field + the user's draft.
@@ -517,8 +526,9 @@ final class Predictor {
         let app = NSWorkspace.shared.frontmostApplication
         var head = ""
         let styles = s.aiLearnStyle ? StyleMemory.shared.examples(app: app?.bundleIdentifier, lang: lang, limit: 6) : []
+        let labeled = AIModel.current.file == AIModel.variants[.quality]?.file   // Base model: labeled sections
         if !styles.isEmpty {
-            head += "How I write:\n" + styles.map { "- " + $0.replacingOccurrences(of: "\n", with: " ") }.joined(separator: "\n") + "\n\n"
+            head += (labeled ? "How I write:\n" : "") + styles.map { "- " + $0.replacingOccurrences(of: "\n", with: " ") }.joined(separator: "\n") + "\n\n"
         }
         var field = String(draft.suffix(1500))
         if s.aiWindowContext, let pid = app?.processIdentifier {
@@ -528,10 +538,11 @@ final class Predictor {
             let probe = String(field.prefix(120))
             if probe.count > 10 { win = win.replacingOccurrences(of: probe, with: "") }
             win = String(win.suffix(2500)).trimmingCharacters(in: .whitespacesAndNewlines)
-            if !win.isEmpty { head += "Screen:\n" + win + "\n\n" }
+            if !win.isEmpty { head += labeled ? "Screen:\n" + win + "\n\n" : win + "\n" }
         }
         if field.isEmpty { field = draft }
-        let prompt = head + "My message:\n" + field
+        // the early versions' plain format for the default (Instruct) model — the one users liked
+        let prompt = head + (labeled ? "My message:\n" : "") + field
         if UserDefaults.standard.bool(forKey: "aiDebug") {
             try? ("[\(app?.bundleIdentifier ?? "-")]\n" + prompt).write(
                 to: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/ExoKey-ai-prompt.txt"),
@@ -683,17 +694,21 @@ final class Predictor {
         return removeBanned(b.rest, lang: lang).isEmpty ? nil : b.rest
     }
 
-    private func isKnownWord(_ w: String, _ lang: Lang) -> Bool {
+    /// A word is spelled right if a dictionary or the user knows it — or it is written in the conversation on screen
+    /// or earlier in the field (names, products, terms: "ProPresenter").
+    private func isKnownWord(_ w: String, _ lang: Lang, seen: Set<String>) -> Bool {
         let low = TextNorm.normalize(w, lang)
         guard low.count > 1 else { return true }
+        if seen.contains(w.lowercased()) || seen.contains(low) { return true }
         if (Engine.shared.dicts[lang]?.freq(low) ?? 0) > 0 { return true }
         for l in Lang.allCases where l != lang { if (Engine.shared.dicts[l]?.freq(low) ?? 0) > 0 { return true } }
         return UserStore.shared.count("uw:\(lang.rawValue):\(low)") > 0 || UserStore.shared.isWord(low, lang)
     }
 
     /// Cuts a suggestion before its first misspelled word. The first word is checked together with what is typed
-    /// of it ("соотв" + "етствуют"); a word still being streamed is checked when complete.
-    private func knownWordsOnly(_ s: String, partial: String, lang: Lang, final: Bool) -> String {
+    /// of it ("соотв" + "етствуют"); a word still being streamed is not shown until it is complete and checked
+    /// (showing it and taking it back made suggestions blink and vanish).
+    private func knownWordsOnly(_ s: String, partial: String, lang: Lang, final: Bool, seen: Set<String>) -> String {
         var out = ""
         var word = partial
         var pending = ""
@@ -702,14 +717,33 @@ final class Predictor {
                 word.append(ch); pending.append(ch)
             } else {
                 if !word.isEmpty {
-                    guard isKnownWord(word, lang) else { return out }
+                    guard isKnownWord(word, lang, seen: seen) else { return trimmedEnd(out) }
                     out += pending
                 }
                 word = ""; pending = ""
                 out.append(ch)
             }
         }
-        if !pending.isEmpty, !final || isKnownWord(word, lang) { out += pending }
+        if !pending.isEmpty, final, isKnownWord(word, lang, seen: seen) { out += pending }
+        return trimmedEnd(out)
+    }
+
+    private func trimmedEnd(_ s: String) -> String {
+        var out = s
+        while let l = out.last, l == " " || l == "," || l == ";" || l == ":" || l == "—" || l == "(" || l == "\"" { out.removeLast() }
+        return out
+    }
+
+    /// Words of the conversation on screen and of the field itself, lowercased.
+    private func seenWords(_ text: String) -> Set<String> {
+        var src = String(text.suffix(3000))
+        if let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
+            src += "\n" + WindowContext.shared.context(for: pid).text
+        }
+        var out = Set<String>()
+        for w in src.lowercased().split(whereSeparator: { !($0.isLetter || $0 == "'" || $0 == "’" || $0 == "-") }) where w.count > 1 {
+            out.insert(String(w))
+        }
         return out
     }
 
@@ -779,18 +813,7 @@ final class Predictor {
         let total = Double(max(1, dictTotal + userTotal))
         let share = Double(top.value) / total
         guard share >= minShare || (f2 > 0 && top.value >= ratio * f2 && share >= minShare / 2) || f2 == 0 && top.value >= 50 else {
-            // no single form wins ("соотв" → -ует / -ии / -енно): offer the part the likely forms share ("етств"),
-            // the ending is the user's (typing test: +1.6% saved, same share of right suggestions)
-            var mass = 0
-            var group: [String] = []
-            for w in d.topK(low, k: 12) {
-                group.append(w.word); mass += w.freq
-                if Double(mass) / total >= 0.6 { break }
-            }
-            guard Double(mass) / total >= 0.6, var stem = group.first else { return "" }
-            for w in group.dropFirst() { while !w.hasPrefix(stem) { stem.removeLast() } }
-            guard stem.count - low.count >= 3 else { return "" }
-            return String(stem.dropFirst(low.count))
+            return ""      // no piece of a word ("соотв" → "етств"): users found half words worse than nothing
         }
         var rest = String(top.key.dropFirst(low.count))
         if partial.uppercased() == partial, partial.count > 1 { rest = rest.uppercased() }
@@ -807,17 +830,28 @@ final class Predictor {
         return modelRest.lowercased() == rest ? s : rest
     }
 
-    private func removeBanned(_ s: String, lang: Lang) -> String {
-        let low = s.lowercased()
-        var cut = s.endIndex
+    /// Cuts the suggestion before the first banned word or phrase. Whole words only: a banned "да" must not cut
+    /// "когда" into "ког". The first word is checked together with what is typed of it (`partial`).
+    private func removeBanned(_ s: String, partial: String = "", lang: Lang) -> String {
+        let isW: (Character) -> Bool = { $0.isLetter || $0.isNumber || $0 == "'" || $0 == "’" || $0 == "ʼ" || $0 == "-" }
+        let glued = !partial.isEmpty && (s.first.map(isW) ?? false)
+        let pre = glued ? partial.lowercased() : ""
+        let low = Array(pre + s.lowercased())
+        let shift = pre.count
+        var cutOff = s.count
         for b in UserStore.shared.banned where b.lang == lang {
-            if let r = low.range(of: b.word.lowercased()) {
-                let off = low.distance(from: low.startIndex, to: r.lowerBound)
-                let idx = s.index(s.startIndex, offsetBy: off)
-                if idx < cut { cut = idx }
+            let w = Array(b.word.lowercased())
+            guard !w.isEmpty, w.count <= low.count else { continue }
+            for i in 0...(low.count - w.count) where i + w.count > shift {
+                guard Array(low[i..<(i + w.count)]) == w else { continue }
+                let startOK = i == 0 || !isW(low[i - 1]) || !isW(w[0])
+                let endOK = i + w.count == low.count || !isW(low[i + w.count]) || !isW(w[w.count - 1])
+                guard startOK, endOK else { continue }
+                cutOff = min(cutOff, max(0, i - shift))
+                break
             }
         }
-        var out = String(s[..<cut])
+        var out = String(s.prefix(cutOff))
         while let l = out.last, l == " " || l == "," { out.removeLast() }
         return out.contains(where: { $0.isLetter || $0.isNumber }) ? out : ""
     }
@@ -850,9 +884,14 @@ final class Predictor {
             if ".!?…".contains(ch) { ended = true; break }
             if out.count >= 120 { stoppedEarly = true; break }
         }
-        // the last word may be unfinished if the model hit the token limit
-        if !ended, !stoppedEarly, cut, inWord, let sp = out.lastIndex(of: " "), sp != out.startIndex {
-            out = String(out[..<sp])
+        // the last word may be unfinished (token limit, or the model stopped being sure in the middle of it)
+        if !ended, !stoppedEarly, cut, inWord {
+            if let sp = out.lastIndex(of: " "), sp != out.startIndex {
+                out = String(out[..<sp])
+            } else {
+                // only a piece of a word ("рабо" + "т", or "раб" after a space): nothing rather than half a word
+                return ""
+            }
         }
         while let l = out.last, l == " " || l == "," || l == ";" || l == ":" || l == "—" || l == "(" || l == "\"" { out.removeLast() }
         // must be mostly letters, and no long runs of the same character

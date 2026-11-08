@@ -128,7 +128,10 @@ final class LayoutManager {
     }
 
     private func selectionChanged() {
+        let before = currentID
         refreshCurrent()
+        // macOS often sends the notification twice; the second one (same layout) is not a new switch
+        if currentID == before && expectedID == nil { return }
         let external = expectedID != currentID
         expectedID = nil
         onChange?(external)
@@ -139,6 +142,28 @@ final class LayoutManager {
     var currentLang: Lang? { current?.lang }
 
     var current: KeyLayout? { all.first { $0.id == currentID } }
+
+    /// The system's own "select previous / next input source" shortcuts (⌃Space, ⌃⌥Space by default), as set in
+    /// System Settings → Keyboard → Shortcuts. They switch the layout and don't edit text.
+    private(set) lazy var switchShortcuts: [(code: Int64, mods: UInt64)] = Self.readSwitchShortcuts()
+
+    func isSwitchShortcut(code: Int64, flags: CGEventFlags) -> Bool {
+        let m = flags.intersection([.maskShift, .maskControl, .maskAlternate, .maskCommand]).rawValue
+        return switchShortcuts.contains { $0.code == code && $0.mods == m }
+    }
+
+    private static func readSwitchShortcuts() -> [(code: Int64, mods: UInt64)] {
+        guard let all = CFPreferencesCopyAppValue("AppleSymbolicHotKeys" as CFString, "com.apple.symbolichotkeys" as CFString)
+                as? [String: Any] else { return [] }
+        var out: [(code: Int64, mods: UInt64)] = []
+        for id in ["60", "61"] {
+            guard let e = all[id] as? [String: Any], (e["enabled"] as? Bool) ?? ((e["enabled"] as? Int) == 1),
+                  let v = e["value"] as? [String: Any], let p = v["parameters"] as? [Any], p.count == 3,
+                  let code = (p[1] as? NSNumber)?.int64Value, let mods = (p[2] as? NSNumber)?.uint64Value else { continue }
+            out.append((code, mods))
+        }
+        return out
+    }
 
     func select(_ lang: Lang) {
         guard let l = layouts[lang], l.id != currentID else { return }

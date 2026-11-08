@@ -9,27 +9,25 @@ final class AIModel: NSObject, ObservableObject, URLSessionDownloadDelegate {
     struct Variant {
         let file: String, url: URL, name: String, bytes: Int64, sizeText: String
     }
-    // Base (not chat) models: trained to continue text, they predict the user's next words better
-    // (tools/test/prompt_bench.py on real samples: 17% vs 14% exact next word, more right guesses when sure).
+    // Default: the model of the early versions (users preferred its phrase suggestions).
+    // Alternative: the Base model (better next-word numbers in tests, but users found it worse in practice).
     static let variants: [AIVariant: Variant] = [
-        .fast: Variant(file: "model-base.gguf",
-                       url: URL(string: "https://huggingface.co/mradermacher/Qwen3-4B-Base-GGUF/resolve/main/Qwen3-4B-Base.Q4_K_M.gguf")!,
-                       name: "Qwen3-4B-Base (Q4_K_M)", bytes: 2_497_280_736, sizeText: "2,5"),
-        .quality: Variant(file: "model-base-q8.gguf",
-                          url: URL(string: "https://huggingface.co/mradermacher/Qwen3-4B-Base-GGUF/resolve/main/Qwen3-4B-Base.Q8_0.gguf")!,
-                          name: "Qwen3-4B-Base (Q8_0)", bytes: 4_280_405_216, sizeText: "4,3"),
+        .fast: Variant(file: "model-fast.gguf",
+                       url: URL(string: "https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf")!,
+                       name: "Qwen3-4B-Instruct-2507 (Q4_K_M)", bytes: 2_497_281_120, sizeText: "2,5"),
+        .quality: Variant(file: "model-base.gguf",
+                          url: URL(string: "https://huggingface.co/mradermacher/Qwen3-4B-Base-GGUF/resolve/main/Qwen3-4B-Base.Q4_K_M.gguf")!,
+                          name: "Qwen3-4B-Base (Q4_K_M)", bytes: 2_497_280_736, sizeText: "2,5"),
     ]
     static var current: Variant { variants[Settings.shared.aiVariant]! }
     static var modelURL: URL { current.url }
     static var modelName: String { current.name }
     static var modelBytes: Int64 { current.bytes }
     static let port = 8737
-    /// The first word is shown only if the model is at least this sure of it (careful / normal / bold).
-    static var minFirstWordProb: Double { [0.12, 0.05, 0.03, 0.0][min(3, Settings.shared.aiConfidence)] }
-    // prompt_bench on real samples (4B Base): 0.12 → shown 14%, right 55%; 0.05 → 29%, 40%; 0.03 → 40%, 34%
-    /// Further words: each token at least this sure.
-    static var minTokenProb: Double { [0.45, 0.30, 0.20, 0.05][min(3, Settings.shared.aiConfidence)] }
-    // 3 = "like Cotypist": always show the model's continuation (only misspelled words are cut)
+    /// Early versions' gate: stop the suggestion when a token is less likely than this…
+    static var minTokenProb: Double { [0.10, 0.05, 0.02, 0.01][min(3, Settings.shared.aiConfidence)] }
+    /// …or the whole suggestion so far is less likely than this.
+    static var minTotalProb: Double { [0.03, 0.01, 0.002, 0.0005][min(3, Settings.shared.aiConfidence)] }
 
     enum State: Equatable {
         case notInstalled
@@ -262,18 +260,11 @@ final class AIModel: NSObject, ObservableObject, URLSessionDownloadDelegate {
                                    "cache_prompt": true, "stop": ["\n"], "stream": true,
                                    "n_probs": 1, "post_sampling_probs": false, "lora": loraBody]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        // Only the confident part is shown: nothing until the first word is complete and likely enough,
-        // then words while every token stays likely.
-        let minFirst = Self.minFirstWordProb, minToken = Self.minTokenProb
+        // Only the confident part is shown: stop when the model starts guessing (early versions' logic).
+        let minToken = Self.minTokenProb, minTotal = Self.minTotalProb
         return Task {
             var acc = ""
             var total = 1.0
-            var firstDone = false
-            func firstWordComplete(_ s: String) -> Bool {
-                let t = s.drop { $0 == " " }
-                guard let i = t.firstIndex(where: { $0.isLetter || $0.isNumber }) else { return false }
-                return t[i...].contains { !($0.isLetter || $0.isNumber || $0 == "'" || $0 == "’" || $0 == "-") }
-            }
             do {
                 let (bytes, _) = try await URLSession.shared.bytes(for: req)
                 for try await line in bytes.lines {
@@ -286,13 +277,9 @@ final class AIModel: NSObject, ObservableObject, URLSessionDownloadDelegate {
                         for t in probs { if let lp = t["logprob"] as? Double { p *= exp(lp) } }
                     }
                     let done = (obj["stop"] as? Bool) == true
-                    // base models sometimes drift into another script (Chinese etc.) — never part of the user's text
-                    if piece.unicodeScalars.contains(where: { (0x2E80...0xD7FF).contains($0.value) || (0xF900...0xFFEF).contains($0.value) }) {
-                        let snapshot = firstDone ? acc : ""
-                        await MainActor.run { onUpdate(snapshot, true, false) }
-                        return
-                    }
-                    if firstDone, !piece.isEmpty, p < minToken {
+                    // models sometimes drift into another script (Chinese etc.) — never part of the user's text
+                    let foreign = piece.unicodeScalars.contains { (0x2E80...0xD7FF).contains($0.value) || (0xF900...0xFFEF).contains($0.value) }
+                    if !piece.isEmpty, foreign || p < minToken || total * p < minTotal {
                         // unsure from here on: finish with what we have
                         let midWord = !(piece.first?.isWhitespace ?? true) && (acc.last?.isLetter ?? false) && (piece.first?.isLetter ?? false)
                         let snapshot = acc
@@ -301,14 +288,6 @@ final class AIModel: NSObject, ObservableObject, URLSessionDownloadDelegate {
                     }
                     total *= p
                     acc += piece
-                    if !firstDone {
-                        guard firstWordComplete(acc) || done else { continue }
-                        if total < minFirst {
-                            await MainActor.run { onUpdate("", true, false) }
-                            return
-                        }
-                        firstDone = true
-                    }
                     let cut = (obj["stopped_limit"] as? Bool) == true || (obj["stop_type"] as? String) == "limit"
                     let snapshot = acc
                     await MainActor.run { onUpdate(snapshot, done, cut) }
@@ -316,7 +295,7 @@ final class AIModel: NSObject, ObservableObject, URLSessionDownloadDelegate {
                 }
             } catch {}
             if !Task.isCancelled {
-                let snapshot = firstDone || total >= minFirst ? acc : ""
+                let snapshot = acc
                 await MainActor.run { onUpdate(snapshot, true, false) }
             }
         }

@@ -61,6 +61,9 @@ final class UserStore: ObservableObject {
         """)
         exec("CREATE TABLE IF NOT EXISTS ngrams(key TEXT PRIMARY KEY, count INTEGER NOT NULL DEFAULT 0)")
         exec("CREATE TABLE IF NOT EXISTS style(id INTEGER PRIMARY KEY AUTOINCREMENT, app TEXT, lang TEXT, text TEXT UNIQUE, at REAL)")
+        // Learned bans (erased suggestions: "т", "и", "the", "что") cut almost every suggestion — no longer made;
+        // remove the old ones. Bans added by hand stay.
+        exec("DELETE FROM entries WHERE kind='banned' AND source='learned'")
     }
 
     @discardableResult
