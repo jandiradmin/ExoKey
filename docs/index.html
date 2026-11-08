@@ -143,6 +143,10 @@ section { padding-block: 84px; }
 .step::before { content: counter(s); display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font: 700 16px/1 var(--font-display); box-shadow: 0 3px 0 #b97a1c; }
 .step h3 { font: 600 18px/1.3 var(--font-body); margin-top: 14px; }
 .step p { color: var(--muted); font-size: 15.5px; margin-top: 8px; }
+.brew { margin-top: 28px; }
+.brew h3 { font: 600 18px/1.3 var(--font-body); }
+.brew pre { margin-top: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); padding: 16px 20px; overflow-x: auto; font: 15px/1.7 var(--font-mono); max-width: 560px; }
+.brew p { color: var(--muted); font-size: 15.5px; margin-top: 10px; }
 
 /* hotkeys */
 .keys { width: 100%; border-collapse: collapse; font-size: 16px; }
@@ -264,6 +268,13 @@ footer a:hover { color: var(--fg); }
       </div>
       <div class="steps" id="steps"></div>
       <img id="gkimg" class="gk" src="media/install-uk.png" alt="" loading="lazy">
+      <div class="brew">
+        <h3 data-i="i_brew">Або через Homebrew</h3>
+        <pre>brew tap jandiradmin/tap
+brew trust jandiradmin/tap
+brew install --cask exokey</pre>
+        <p data-i="i_brew_note">Оновлення — brew upgrade --cask exokey. Кроки 2 і 3 потрібні й тут.</p>
+      </div>
     </div>
   </section>
 
@@ -347,6 +358,7 @@ const T = {
       ["Відкритий код", "Кожен рядок можна перевірити на GitHub. Ліцензія MIT."],
     ],
     i_eyebrow: "Встановлення", i_h2: "Дві хвилини — і готово",
+    i_brew: "Або через Homebrew", i_brew_note: "Оновлення — brew upgrade --cask exokey. Кроки 2 і 3 потрібні й тут.",
     steps: [
       ["Завантажте", "Архів з останньою версією на GitHub. Розпакуйте й перенесіть ExoKey.app у «Програми»."],
       ["Дозвольте запуск", "Якщо macOS пише «Not Opened», натисніть Done, потім Системні параметри → Приватність і безпека → «Усе одно відкрити». Картинка нижче."],
@@ -396,6 +408,7 @@ const T = {
       ["Open source", "Every line is on GitHub. MIT license."],
     ],
     i_eyebrow: "Install", i_h2: "Ready in two minutes",
+    i_brew: "Or with Homebrew", i_brew_note: "Update with brew upgrade --cask exokey. Steps 2 and 3 are needed here too.",
     steps: [
       ["Download", "Get the latest version from GitHub. Unzip it and move ExoKey.app to Applications."],
       ["Allow it to open", "If macOS says “Not Opened”, click Done, then System Settings → Privacy & Security → “Open Anyway”. See the picture below."],
@@ -445,6 +458,7 @@ const T = {
       ["Открытый код", "Каждую строку можно проверить на GitHub. Лицензия MIT."],
     ],
     i_eyebrow: "Установка", i_h2: "Две минуты — и готово",
+    i_brew: "Или через Homebrew", i_brew_note: "Обновление — brew upgrade --cask exokey. Шаги 2 и 3 нужны и здесь.",
     steps: [
       ["Скачайте", "Архив с последней версией на GitHub. Распакуйте и перенесите ExoKey.app в «Программы»."],
       ["Разрешите запуск", "Если macOS пишет «Not Opened», нажмите Done, затем Системные настройки → Конфиденциальность и безопасность → «Всё равно открыть». Картинка ниже."],
