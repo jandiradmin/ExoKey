@@ -13,7 +13,16 @@
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ExoKey</title>
+<title>ExoKey — перемикач розкладки для macOS з ШІ | Keyboard layout switcher for Mac</title>
+<meta name="keywords" content="ExoKey, перемикач розкладки, автоматичне перемикання розкладки, переключатель раскладки, автопереключение раскладки, keyboard layout switcher, auto layout switcher, wrong keyboard layout fix, macOS, Mac, українська розкладка, русская раскладка, English Ukrainian Russian, виправлення помилок, исправление опечаток, typo correction, автодоповнення, автодополнение, AI autocomplete, offline autocomplete, локальний ШІ, local AI, калькулятор, конвертер валют, open source, безкоштовно, бесплатно, free">
+<meta name="author" content="Yan Hordashevskyy">
+<link rel="canonical" href="https://exokey.top/">
+<link rel="alternate" hreflang="en" href="https://exokey.top/guide/">
+<link rel="alternate" hreflang="uk" href="https://exokey.top/guide/uk/">
+<link rel="alternate" hreflang="ru" href="https://exokey.top/guide/ru/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ExoKey">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="description" content="ExoKey — безкоштовний перемикач розкладки для macOS з локальним ШІ: виправляє текст, набраний не тією мовою, помилки й підказує наступні слова. Англійська, українська, російська.">
 <meta property="og:title" content="ExoKey — розкладка, помилки й підказки ШІ для macOS">
@@ -21,6 +30,7 @@
 <meta property="og:image" content="https://exokey.top/media/demo-en.gif">
 <meta property="og:url" content="https://exokey.top/">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='4' width='28' height='24' rx='6' fill='%23ffb547'/%3E%3Crect x='6' y='7' width='20' height='15' rx='4' fill='%231a1306' opacity='.18'/%3E%3Ctext x='16' y='19.5' font-family='Arial' font-weight='700' font-size='11' text-anchor='middle' fill='%231a1306'%3EEx%3C/text%3E%3C/svg%3E">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "ExoKey", "url": "https://exokey.top/", "operatingSystem": "macOS 13+", "applicationCategory": "UtilitiesApplication", "softwareRequirements": "Apple Silicon", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "license": "https://opensource.org/licenses/MIT", "downloadUrl": "https://github.com/jandiradmin/ExoKey/releases/latest", "inLanguage": ["en", "uk", "ru"], "description": "Free open-source keyboard layout switcher for macOS: fixes text typed in the wrong layout (English, Ukrainian, Russian), corrects typos and suggests the next words with a local AI model.", "featureList": ["Automatic keyboard layout correction", "Typo correction", "Offline AI autocomplete", "Calculator in any text field", "Unit and currency conversion", "Language per app", "Layout label at the cursor"], "author": {"@type": "Person", "name": "Yan Hordashevskyy"}}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap">
@@ -155,6 +165,17 @@ section { padding-block: 84px; }
 .final p { color: var(--muted); margin: 16px auto 0; max-width: 36em; font-size: 18px; }
 .final .cta { justify-content: center; }
 
+.navlink { color: var(--muted); text-decoration: none; font-weight: 500; margin-right: 6px; }
+.navlink:hover { color: var(--fg); }
+@media (max-width: 600px) { .navlink { display: none; } }
+.exo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 700px) { .exo-grid { grid-template-columns: minmax(0, 1fr); } }
+.exo { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 16px; align-items: start; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 22px; box-shadow: 0 4px 0 #0a0b0d; color: var(--fg); text-decoration: none; transition: border-color .15s; }
+.exo:hover { border-color: var(--accent); }
+.exo svg { width: 56px; height: 56px; }
+.exo h3 { font: 700 19px/1.2 var(--font-display); margin: 2px 0 8px; }
+.exo p { color: var(--muted); margin: 0 0 12px; }
+.exo span { color: var(--accent); font-weight: 600; }
 footer { border-top: 1px solid var(--line); padding-block: 30px calc(30px + env(safe-area-inset-bottom, 0px)); color: var(--muted); font-size: 14px; }
 footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
 footer a { color: var(--muted); text-decoration: none; }
@@ -181,6 +202,7 @@ footer a:hover { color: var(--fg); }
         <button data-lang="en" aria-pressed="false">EN</button>
         <button data-lang="ru" aria-pressed="false">RU</button>
       </div>
+      <a class="navlink" id="docslink" href="guide/uk/" data-i="nav_docs">Посібник</a>
       <a class="btn btn-primary" href="https://github.com/jandiradmin/ExoKey/releases/latest" data-dl="menu" data-i="nav_dl">Завантажити</a>
     </div>
   </div>
@@ -265,6 +287,16 @@ footer a:hover { color: var(--fg); }
     </div>
   </section>
 
+  <section id="exo" style="padding-top:0">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="eyebrow" data-i="x_eyebrow">Родина Exo</div>
+        <h2 data-i="x_h2">Ще дві програми для вашого Mac</h2>
+      </div>
+      <div class="exo-grid" id="exolist"></div>
+    </div>
+  </section>
+
   <section class="final">
     <div class="wrap">
       <h2 data-i="final_h2">Спробуйте ExoKey</h2>
@@ -281,7 +313,7 @@ footer a:hover { color: var(--fg); }
 <footer>
   <div class="wrap">
     <span>© 2026 ExoKey · MIT</span>
-    <span><a href="https://github.com/jandiradmin/ExoKey">GitHub</a> · <a href="https://github.com/jandiradmin/ExoKey/releases" data-i="releases">Версії</a> · <a href="https://github.com/jandiradmin/ExoKey/issues" data-i="issues">Повідомити про помилку</a></span>
+    <span><a href="https://github.com/jandiradmin/ExoKey">GitHub</a> · <a href="https://github.com/jandiradmin/ExoKey/releases" data-i="releases">Версії</a> · <a href="https://github.com/jandiradmin/ExoKey/issues" data-i="issues">Повідомити про помилку</a> · <a id="docslink2" href="guide/uk/" data-i="nav_docs">Посібник</a> · <a href="https://github.com/jandiradmin/ExoCalc">ExoCalc</a> · <a href="https://exocommander.top">ExoCommander</a></span>
   </div>
 </footer>
 
@@ -436,6 +468,14 @@ const T = {
   },
 };
 
+const EXTRA = {"uk": {"nav_docs": "Посібник", "docs": "guide/uk/", "x_eyebrow": "Родина Exo", "x_h2": "Ще дві програми для вашого Mac", "exo": [["ExoCalc", "Калькулятор-блокнот: пишете рядок за рядком, результат одразу праворуч. Валюти й криптовалюти, одиниці, час і дати, звичайні слова. macOS і Windows.", "https://github.com/jandiradmin/ExoCalc", "Завантажити на GitHub →", "calc"], ["ExoCommander", "Нативний двопанельний файловий менеджер для macOS. F-клавіші, SFTP, архіви, фонова черга копіювання, вбудований термінал, групове перейменування.", "https://exocommander.top", "exocommander.top →", "cmd"]]}, "en": {"nav_docs": "Guide", "docs": "guide/", "x_eyebrow": "The Exo family", "x_h2": "Two more apps for your Mac", "exo": [["ExoCalc", "A notepad calculator: type line by line, see results on the right. Currencies and crypto, units, time and dates, plain words. macOS and Windows.", "https://github.com/jandiradmin/ExoCalc", "Download on GitHub →", "calc"], ["ExoCommander", "A native dual-pane file manager for macOS. F-keys, SFTP, archives, background copy queue, built-in terminal, Multi-Rename.", "https://exocommander.top", "exocommander.top →", "cmd"]]}, "ru": {"nav_docs": "Руководство", "docs": "guide/ru/", "x_eyebrow": "Семейство Exo", "x_h2": "Ещё две программы для вашего Mac", "exo": [["ExoCalc", "Калькулятор-блокнот: пишете строку за строкой, результат сразу справа. Валюты и криптовалюты, единицы, время и даты, обычные слова. macOS и Windows.", "https://github.com/jandiradmin/ExoCalc", "Скачать на GitHub →", "calc"], ["ExoCommander", "Нативный двухпанельный файловый менеджер для macOS. F-клавиши, SFTP, архивы, фоновая очередь копирования, встроенный терминал, групповое переименование.", "https://exocommander.top", "exocommander.top →", "cmd"]]}};
+const FAQ_X = {"uk": ["Чим ExoKey відрізняється від інших перемикачів розкладки?", "Він безкоштовний і з відкритим кодом, працює на сучасних Mac з Apple Silicon, знає українську, а підказки ШІ працюють локально, без хмари. Усі можливості описані в Посібнику."], "en": ["How is ExoKey different from other layout switchers?", "It's free and open source, built for modern Apple Silicon Macs, supports Ukrainian, and its AI suggestions run locally with no cloud. Every feature is described in the Guide."], "ru": ["Чем ExoKey отличается от других переключателей раскладки?", "Он бесплатный и с открытым кодом, работает на современных Mac с Apple Silicon, знает украинский, а подсказки ИИ работают локально, без облака. Все возможности описаны в Руководстве."]};
+for (const l in EXTRA) { Object.assign(T[l], EXTRA[l]); T[l].faq = T[l].faq.concat([FAQ_X[l]]); }
+const EXO_ICON = {
+  calc: '<svg viewBox="0 0 56 56" aria-hidden="true"><rect x="2" y="2" width="52" height="52" rx="14" fill="#57d18b"/><rect x="12" y="11" width="32" height="10" rx="3" fill="#0e1013" opacity=".85"/><g fill="#0e1013" opacity=".85"><rect x="12" y="26" width="8" height="7" rx="2"/><rect x="24" y="26" width="8" height="7" rx="2"/><rect x="36" y="26" width="8" height="7" rx="2"/><rect x="12" y="37" width="8" height="7" rx="2"/><rect x="24" y="37" width="8" height="7" rx="2"/><rect x="36" y="37" width="8" height="7" rx="2"/></g></svg>',
+  cmd: '<svg viewBox="0 0 56 56" aria-hidden="true"><rect x="2" y="2" width="52" height="52" rx="14" fill="#337af2"/><rect x="10" y="12" width="17" height="32" rx="3" fill="#fff" opacity=".92"/><rect x="29" y="12" width="17" height="32" rx="3" fill="#fff" opacity=".55"/><g fill="#337af2"><rect x="13" y="17" width="11" height="2.5" rx="1"/><rect x="13" y="23" width="9" height="2.5" rx="1"/><rect x="13" y="29" width="11" height="2.5" rx="1"/></g></svg>',
+};
+
 const check = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M5 12.5l4.2 4.2L19 7"/></svg>';
 const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
@@ -458,6 +498,10 @@ function apply(lang) {
   document.getElementById("keyrows").innerHTML = L.keys.map(([a, k]) =>
     `<tr><td>${esc(a)}</td><td>${k.split(" / ").map(g => g.split(" ").map(x => `<span class="k">${esc(x)}</span>`).join(" ")).join(" / ")}</td></tr>`).join("");
   document.getElementById("faqlist").innerHTML = L.faq.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("");
+  document.getElementById("exolist").innerHTML = L.exo.map(([n, d, u, t, ic]) =>
+    `<a class="exo" href="${u}" data-promo="${n}">${EXO_ICON[ic]}<div><h3>${n}</h3><p>${esc(d)}</p><span>${esc(t)}</span></div></a>`).join("");
+  document.getElementById("docslink").href = L.docs;
+  document.getElementById("docslink2").href = L.docs;
   const items = L.strip.map(([a, b]) => `<span>${esc(a)}<i>→</i><b>${esc(b)}</b></span>`).join("");
   document.getElementById("strip").innerHTML = items + items;
 }
@@ -479,6 +523,10 @@ const nav = document.querySelector(".nav");
 addEventListener("scroll", () => nav.classList.toggle("scrolled", scrollY > 8), { passive: true });
 apply(pick());
 // Google Analytics: "download_click" event — which button, in which site language
+document.addEventListener("click", e => {
+  const a = e.target.closest("[data-promo]");
+  if (a && typeof gtag === "function") gtag("event", "promo_click", { app: a.dataset.promo, site_lang: document.documentElement.lang, transport_type: "beacon" });
+});
 document.querySelectorAll("[data-dl]").forEach(a => a.addEventListener("click", () => {
   if (typeof gtag === "function") gtag("event", a.dataset.dl === "donate" ? "donate_click" : "download_click", {
     button: a.dataset.dl, site_lang: document.documentElement.lang, transport_type: "beacon" });

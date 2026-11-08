@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://exokey.top/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://exokey.top/guide/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://exokey.top/guide/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://exokey.top/guide/uk/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://exokey.top/guide/ru/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://exokey.top/guide/"/>
+  </url>
+  <url>
+    <loc>https://exokey.top/guide/uk/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://exokey.top/guide/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://exokey.top/guide/uk/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://exokey.top/guide/ru/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://exokey.top/guide/"/>
+  </url>
+  <url>
+    <loc>https://exokey.top/guide/ru/</loc>
+    <lastmod>2026-11-07</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://exokey.top/guide/"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://exokey.top/guide/uk/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://exokey.top/guide/ru/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://exokey.top/guide/"/>
+  </url>
+</urlset>
