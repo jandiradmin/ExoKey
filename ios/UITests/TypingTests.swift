@@ -101,7 +101,7 @@ final class TypingTests: XCTestCase {
             let sp = key("␣")
             guard sp.exists else { return }
             let from = sp.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
-            from.press(forDuration: 0.05, thenDragTo: sp.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)))
+            from.press(forDuration: 0.01, thenDragTo: sp.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)), withVelocity: .fast, thenHoldForDuration: 0)
             sleep(1)
         }
     }

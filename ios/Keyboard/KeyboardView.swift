@@ -708,7 +708,7 @@ final class KeyboardView: UIView {
         work.async { [weak self] in
             let sg = Suggester.shared
             let ff = sg.fixes(sg.norm(typed, lang), lang: lang, near: near, final: true, deep: true)
-            guard let best = ff.first?.w else { return }
+            guard let best = ff.first(where: { $0.p >= 0.25 || $0.w.contains(" ") })?.w else { return }
             DispatchQueue.main.async { self?.setChip(typed, Self.matchCase(best, typed)) }
         }
     }
@@ -911,7 +911,8 @@ final class KeyboardView: UIView {
             // what space would do with this word: worked out here, never on the key press itself
             let finalFixes = sg.fixes(key, lang: lang, near: near, final: true, deep: true)
             let fix = sg.autocorrect(word, lang: lang, near: near, finalFixes: finalFixes)
-            let fixes = finalFixes.prefix(3).map(\.w)
+            // the "↩" button only for a likely slip (not "кей" → "ей": dropping the first letter)
+            let fixes = finalFixes.filter { $0.p >= 0.25 || $0.w.contains(" ") }.prefix(3).map(\.w)
             if word.first?.isUppercase == true {
                 out = out.map { $0.first?.isUppercase == true ? $0 : word == word.uppercased() && word.count > 1 ? $0.uppercased() : $0.prefix(1).uppercased() + $0.dropFirst() }
             }

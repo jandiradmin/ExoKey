@@ -46,11 +46,15 @@ final class Suggester {
     func fixes(_ key: String, lang: KeyboardLang, near: Neighbors, final: Bool = false, deep: Bool = false) -> [(w: String, s: Double, p: Double)] {
         guard key.count >= 3, let d = dict(lang) else { return [] }
         // a typed form the spelling dictionary doesn't confirm counts as not a word ("сегодн")
+        // a finished word: a real but rare form ("аишу" — a name's form) yields only to a word that is far more
+        // common one slip away (×1000: "пишу"); a common real word ("отдача", "пробую") stays as typed
         let typedMass = max(1, final ? (isJunk(key, lang) ? 0 : d.freq(key)) : d.prefixFreq(key))
+        // how much more common a fix must be: a likelier slip needs less (a neighbour key ×50, a far key ×400)
+        func enough(_ f: Int, _ weight: Double) -> Bool {
+            final && typedMass > 1 ? Double(f) * weight > 50 * Double(typedMass) : f > 20 * typedMass
+        }
         // a real word, or the beginning of common words: nothing to fix (and no slow search on every key)
-        if typedMass >= (final ? 1000 : 5000) { return [] }
-        // a real word, however rare ("отдача", "тактильная"), is never "fixed" into another one
-        if final, isReal(key, lang) { return [] }
+        if final ? (d.freq(key) >= 1000 && !isJunk(key, lang)) : typedMass >= 5000 { return [] }
         var out: [String: (s: Double, p: Double)] = [:]
         // p — how likely the slip itself is; s — frequency × p
         func add(_ w: String, _ f: Int, _ weight: Double) {
@@ -62,7 +66,7 @@ final class Suggester {
             // "нов" + space is a cut-short word, not "но" with an extra letter
             if final, cand.count < key.count, cand == String(key.dropLast()) { weight *= 0.1 }
             let f = d.freq(cand)
-            if f > 20 * typedMass { add(cand, f, weight) }
+            if enough(f, weight) { add(cand, f, weight) }
         }
         // two neighbour keys missed in a short word ("tiu" → "you")
         if key.count <= 4, !near.isEmpty {
@@ -73,7 +77,8 @@ final class Suggester {
                         for b in near[c[j]] ?? [] {
                             var t = c; t[i] = a; t[j] = b
                             let w = String(t), f = d.freq(w)
-                            if f > 20 * typedMass { add(w, f, 0.25) }
+                            // two slips are much less likely than one ("ввл" is "ввел", not "ваш")
+                            if enough(f, 0.1) { add(w, f, 0.1) }
                         }
                     }
                 }
@@ -86,7 +91,7 @@ final class Suggester {
             for (v, w1) in first where d.prefixFreq(v) > 0 {
                 for (cand, w2) in oneSlip(v, lang, near) where w2 >= 0.5 && cand != key {
                     let f = d.freq(cand)
-                    if f >= 1000, f > 20 * typedMass { add(cand, f, w1 * w2 * 0.5) }
+                    if f >= 1000, enough(f, w1 * w2 * 0.5) { add(cand, f, w1 * w2 * 0.5) }
                 }
             }
         }
@@ -126,7 +131,7 @@ final class Suggester {
         // and only by a likely slip: a neighbour key, swapped / missed / doubled letter, a letter for the space
         // (not "нов" → "но", not "млрко" → "марко"); two slips only in a 3-letter word ("tiu" → "you")
         let all = list.filter { $0.w.contains(" ") || freq($0.w, lang) >= 1000 }
-        let fx = all.filter { $0.w.contains(" ") || $0.p >= 0.5 || (key.count == 3 && $0.p >= 0.25) }
+        let fx = all.filter { $0.w.contains(" ") || $0.p >= 0.5 || (key.count == 3 && $0.p >= 0.1) }
         guard let best = fx.first else { return nil }
         let second = all.first { $0.w != best.w }?.s ?? 0
         let exact = isJunk(key, lang) ? 0 : Double(freq(key, lang))
