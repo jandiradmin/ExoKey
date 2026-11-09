@@ -149,6 +149,7 @@ final class KeyboardView: UIView {
         var downAt: TimeInterval = 0     // when the finger touched the glass (not when iOS delivered it)
         var last: CGPoint = .zero        // where this finger was seen last (to tell it from another finger)
         var cursorMode = false           // space held: sliding the finger moves the cursor
+        var moves = 0                    // separate small steps of the finger (a slide), not one jump
         var cursorX: CGFloat = 0         // finger position at the last cursor step
         init(cap: KeyCap, start: CGPoint) { self.cap = cap; self.start = start }
         func stop() { longTimer?.invalidate(); repeatTimer?.invalidate() }
@@ -465,6 +466,8 @@ final class KeyboardView: UIView {
     @objc private func capDrag(_ cap: KeyCap, event: UIEvent?) {
         guard let tr = tracks[ObjectIdentifier(cap)], let t = touch(of: cap, event) else { return }
         let p = t.location(in: self)
+        let step = hypot(p.x - tr.last.x, p.y - tr.last.y)
+        if step > 1, step < 40 { tr.moves += 1 }
         tr.last = p
         if let popup = tr.popup { popup.select(at: convert(p, to: popup)); return }
         if tr.cursorMode { moveCursor(tr, to: p.x); return }
@@ -493,9 +496,9 @@ final class KeyboardView: UIView {
         switch tr.cap.key.kind {
         case .space:
             // a swipe along the space bar switches the language (the space typed on touch-down is taken back)
-            // a deliberate slide, not a thumb flattening on a quick tap (that moved the touch 78 pt in 0.08 s)
-            let held = (touch(of: cap, event)?.timestamp ?? tr.downAt) - tr.downAt
-            if abs(p.x - tr.start.x) > 60, held > 0.2, abs(p.y - tr.start.y) < tr.cap.frame.height, lastOtherDown <= tr.downAt {
+            // a slide is several small steps of the finger along the bar; a thumb flattening on a quick tap
+            // makes one jump (78 pt at once) — a quick swipe must still work, so time is not the test
+            if abs(p.x - tr.start.x) > 50, tr.moves >= 3, abs(p.y - tr.start.y) < tr.cap.frame.height, lastOtherDown <= tr.downAt {
                 KLog.write("space swipe \(Int(p.x - tr.start.x))pt → language")
                 if !undoCorrection() { proxy?.deleteBackward() }
                 lastWasSpace = false

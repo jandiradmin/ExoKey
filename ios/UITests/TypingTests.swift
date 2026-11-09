@@ -201,7 +201,8 @@ final class TypingTests: XCTestCase {
         sleep(1)
         ensureRussian()
         let sp = key("␣")
-        let swipe = { sp.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)).press(forDuration: 0.05, thenDragTo: sp.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5))) }
+        // a quick flick: short press, fast drag
+        let swipe = { sp.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)).press(forDuration: 0.01, thenDragTo: sp.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)), withVelocity: .fast, thenHoldForDuration: 0) }
         swipe(); sleep(1)
         let en = key("q").exists
         swipe(); sleep(1)
