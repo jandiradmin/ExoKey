@@ -649,6 +649,11 @@ final class KeyboardView: UIView {
         var before = proxy?.documentContextBeforeInput ?? ""
         let typed = Self.word(before)
         if !typed.isEmpty { KLog.write("typed «\(typed)» shown \(lastShown)") }
+        // the "↩" button for an earlier word lives for 3 more words (a newer typo replaces it at once)
+        if chip != nil, !typed.isEmpty {
+            chipAge += 1
+            if chipAge > 3 { clearChip() }
+        }
         localWord = ""
         prepareNext()
         prevFix = nil
@@ -693,9 +698,12 @@ final class KeyboardView: UIView {
 
     /// A finished word with a typo: "↩ fix" stays in the bar while you type on; a tap fixes that word in place.
     private var chip: (word: String, fix: String)?
+    /// Words typed since the button appeared: after a few it is old news and goes away.
+    private var chipAge = 0
 
     private func setChip(_ word: String, _ fix: String) {
         chip = (word, fix)
+        chipAge = 0
         bar.chip = "↩ " + fix
         KLog.write("previous-word button «\(word)» → «\(fix)»")
     }
