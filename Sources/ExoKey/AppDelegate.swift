@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import ApplicationServices
 import Combine
 import SwiftUI
@@ -54,10 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 Predictor.shared.enableAccessibility(for: app)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { WindowContext.shared.refresh(maxAge: 0) }
             }
-            if let id = app?.bundleIdentifier, let raw = Settings.shared.appLayouts[id], let l = Lang(rawValue: raw) {
-                LayoutManager.shared.select(l)
-                self?.updateStatus()
-            }
+            self?.restoreLayout(for: app?.bundleIdentifier)
         }
         NotificationCenter.default.addObserver(forName: .exoLayoutChanged, object: nil, queue: .main) { _ in
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { LayoutBadge.shared.flash() }
@@ -125,12 +123,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    // MARK: Layout per app
+
+    private var frontID: String?
+
+    /// Leaving an app remembers its layout; coming back selects the app's assigned layout if it has one,
+    /// otherwise the layout it was left with.
+    private func restoreLayout(for id: String?) {
+        let s = Settings.shared
+        var last = UserDefaults.standard.dictionary(forKey: "appLastLayouts") as? [String: String] ?? [:]
+        if let prev = frontID, prev != id, let cur = LayoutManager.shared.currentLang {
+            last[prev] = cur.rawValue
+            UserDefaults.standard.set(last, forKey: "appLastLayouts")
+        }
+        frontID = id
+        guard let id else { return }
+        let target = s.appLayouts[id].flatMap(Lang.init(rawValue:))
+            ?? (s.rememberAppLayout ? last[id].flatMap(Lang.init(rawValue:)) : nil)
+        if let l = target, l != LayoutManager.shared.currentLang {
+            LayoutManager.shared.select(l)
+            Log.write("layout -> \(l.rawValue) on returning to \(id)")
+            updateStatus()
+            // macOS may switch the layout back right after the app comes forward (the log showed iTerm2 going
+            // ru → en within 20 ms); one more try when it settles, unless the user switched apps meanwhile
+            let activated = Date()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                guard self?.frontID == id, let now = LayoutManager.shared.currentLang, now != l else { return }
+                // the user already pressed something here (⌃Space, letters): their layout wins
+                guard Engine.shared.lastUserInput < activated else {
+                    Log.write("layout: \(id) is \(now.rawValue) after a user key — left as is")
+                    return
+                }
+                Log.write("layout: \(id) came back as \(now.rawValue), selecting \(l.rawValue) again (secure input: \(IsSecureEventInputEnabled()))")
+                LayoutManager.shared.select(l)
+                self?.updateStatus()
+            }
+        }
+    }
+
     // MARK: Status
 
     private func updateExcluded() {
         let id = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? ""
         Engine.shared.excludedApp = settings.excludedApps.contains(id)
         Engine.shared.lockedLang = settings.appLayoutLocks.contains(id) ? settings.appLayouts[id].flatMap(Lang.init(rawValue:)) : nil
+        Engine.shared.preferredLang = settings.appLayouts[id].flatMap(Lang.init(rawValue:))
     }
 
     func updateStatus() {

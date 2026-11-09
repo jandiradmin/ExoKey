@@ -14,11 +14,19 @@ final class Engine {
     var excludedApp = false
     /// Language assigned to the frontmost app: automatic corrections may only switch to it.
     var lockedLang: Lang?
+    /// The last key the user pressed (letters, ⌃Space…): ExoKey's own layout choices never override it.
+    var lastUserInput = Date.distantPast
+    /// The layout assigned to the current app ("Layout per app"): mid-word switches away from it wait for the word end.
+    var preferredLang: Lang?
     var recordingHotkey = false
     var onStateChange: (() -> Void)?
 
     // Tunables
     private let minAltPrefix = 20        // ppb: alternative prefix must be at least this common
+    /// Switching the layout in the middle of a word is a visible action the user didn't ask for: the other
+    /// language's beginning must be a common one (тысячи употреблений: "ghbd" → "прив" has ~10⁶),
+    /// not merely possible ("reqe" → "куйу" had 33).
+    private let minMidPrefix = 2000
     private let midRatio = 100           // alternative must beat original prefix by this factor
     private let finalRatio = 1000        // ...and an existing original word by this factor
     private let ambiguityRatio = 4       // best vs second-best alternative
@@ -287,6 +295,7 @@ final class Engine {
         }
 
         keyCount += 1
+        lastUserInput = Date()
         if keyCount <= 3 || keyCount % 200 == 0 {
             Log.write("key #\(keyCount) enabled=\(settings.enabled) excluded=\(excludedApp) secure=\(IsSecureEventInputEnabled()) layout=\(layouts.currentID) lang=\(layouts.currentLang?.rawValue ?? "nil")")
         }
@@ -696,11 +705,12 @@ final class Engine {
         let oText = core(keys, o)
         guard keys.count >= settings.minLetters, !store.isException(oText, o) else { return nil }
         let pO = prefixScore(oText, o)
-        // The previous word is in this language and this beginning exists in it: the user is writing in this
-        // language — a few letters are no evidence against it ("the" + "nt" is not "те"). Decide at the end of the
-        // word, when the whole word is known; flip mid-word only if this beginning is impossible here.
-        if pO > 0, let p = prevWordLang, p == o { return nil }
-        let alts = alternatives(keys, excluding: o, score: prefixScore, minScore: minAltPrefix)
+        // The user is writing in this language (the previous word is in it, or the app is assigned to it):
+        // a few letters are no evidence against it — even an impossible beginning is usually a typo
+        // ("new" typed "nre", "reque…" typed "reqe" became "тку", "куйу"). Decide at the end of the word.
+        if let p = prevWordLang, p == o { return nil }
+        if preferredLang == o { return nil }
+        let alts = alternatives(keys, excluding: o, score: prefixScore, minScore: minMidPrefix)
         guard let best = alts.first else { return nil }
         if pO > 0 && best.score < pO * midRatio { return nil }
         return pick(alts)

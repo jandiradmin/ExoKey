@@ -1,10 +1,14 @@
+import Foundation
+#if os(macOS)
 import AppKit
 import ApplicationServices
+#endif
 
 /// Inline calculator: typing "2+2=" appends "4".
 enum Calculator {
     static let allowed = Set("0123456789+-*/×÷^%()., :")
 
+    #if os(macOS)
     /// Text of the current line before the caret, via Accessibility (sees edits the key buffer can't).
     static func lineBeforeCaret() -> String? {
         let sys = AXUIElementCreateSystemWide()
@@ -27,6 +31,7 @@ enum Calculator {
         let before = ns.substring(with: NSRange(location: start, length: range.location - start))
         return before.split(separator: "\n", omittingEmptySubsequences: false).last.map(String.init)
     }
+    #endif
 
     /// The expression at the end of a line: after the last "=" (chains like 600*2=1200+200=), digits and operators only.
     static func tail(_ line: String) -> String {
@@ -34,7 +39,10 @@ enum Calculator {
         if let i = s.lastIndex(of: "=") { s = s[s.index(after: i)...] }
         var chars: [Character] = []
         // digits, operators and Latin function names (sin, sqrt, pi…)
-        for ch in s.reversed() {
+        let rev = Array(s.reversed())
+        for (k, ch) in rev.enumerated() {
+            // ". " / ", " end a sentence, not a number: "…=1000. 1200*15%=" is "1200*15%"
+            if ch == " ", k + 1 < rev.count, rev[k + 1] == "." || rev[k + 1] == "," { break }
             if allowed.contains(ch) || ch == "°" || ch == "π" || (ch.isASCII && ch.isLetter) { chars.append(ch) } else { break }
         }
         var e = String(chars.reversed())
@@ -97,7 +105,8 @@ enum Calculator {
         if v == v.rounded(), abs(v) < 1e15 {
             s = String(Int64(v))
         } else {
-            s = String(format: "%.10g", v)
+            // at most 3 digits after the point
+            s = abs(v) < 1e15 ? String(format: "%.3f", v) : String(format: "%.10g", v)
             if s.contains("."), !s.contains("e") {
                 while s.hasSuffix("0") { s.removeLast() }
                 if s.hasSuffix(".") { s.removeLast() }

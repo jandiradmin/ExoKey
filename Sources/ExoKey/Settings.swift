@@ -114,6 +114,8 @@ final class Settings: ObservableObject {
     @Published var appLayouts: [String: String] { didSet { d.set(appLayouts, forKey: "appLayouts") } }
     /// Apps where auto-correction may switch only to the assigned language
     @Published var appLayoutLocks: [String] { didSet { d.set(appLayoutLocks, forKey: "appLayoutLocks") } }
+    /// Returning to an app brings back the layout it was left with (apps with an assigned layout use that one)
+    @Published var rememberAppLayout: Bool { didSet { d.set(rememberAppLayout, forKey: "rememberAppLayout") } }
     @Published var hkUndo: Hotkey { didSet { save(hkUndo, "hkUndo") } }
     @Published var hkConvert: Hotkey { didSet { save(hkConvert, "hkConvert") } }
     @Published var hkPause: Hotkey { didSet { save(hkPause, "hkPause") } }
@@ -169,6 +171,7 @@ final class Settings: ObservableObject {
         implicitUndo = d.bool(forKey: "implicitUndo")
         appLayouts = d.dictionary(forKey: "appLayouts") as? [String: String] ?? [:]
         appLayoutLocks = d.stringArray(forKey: "appLayoutLocks") ?? []
+        rememberAppLayout = d.object(forKey: "rememberAppLayout") as? Bool ?? true
         let ctrlOpt = CGEventFlags([.maskControl, .maskAlternate]).rawValue
         hkUndo = Self.load(d, "hkUndo") ?? Hotkey(keyCode: 6, mods: ctrlOpt)      // ⌃⌥Z
         hkConvert = Self.load(d, "hkConvert") ?? Hotkey(keyCode: 7, mods: ctrlOpt) // ⌃⌥X

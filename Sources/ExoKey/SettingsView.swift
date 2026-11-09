@@ -248,6 +248,7 @@ struct SettingsView: View {
                 Toggle(L.t("set.implicitUndo"), isOn: $s.implicitUndo)
             }
             Section {
+                Toggle(L.t("set.rememberAppLayout"), isOn: $s.rememberAppLayout)
                 ForEach(s.appLayouts.keys.sorted(), id: \.self) { id in
                     HStack {
                         Text(appName(id))
