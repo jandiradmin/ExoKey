@@ -604,6 +604,9 @@ final class KeyboardView: UIView {
     }
 
     private func ret() {
+        // the last word of a line is learned too ("утро всем⏎")
+        let before = proxy?.documentContextBeforeInput ?? ""
+        if before.last?.isLetter == true { NGrams.shared.learn(NGrams.sentenceWords(before)) }
         proxy?.insertText("\n")
         localWord = ""
         lastCorrection = nil

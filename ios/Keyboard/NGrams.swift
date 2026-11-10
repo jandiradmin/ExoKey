@@ -46,12 +46,12 @@ final class NGrams {
     }
 
     /// Next words after the sentence so far, most likely first: the last two words, then the last one.
-    /// Seen at least twice — once is not a habit.
+    /// Already after the first time (the bar is empty after a space anyway); more frequent ones go first.
     func predict(after words: [String], limit: Int = 3) -> [String] {
         var out: [String] = []
         var seen = Set<String>()
         func add(_ ctx: String) {
-            for (w, c) in (next[ctx] ?? [:]).sorted(by: { $0.value > $1.value }) where c >= 2 && seen.insert(w).inserted {
+            for (w, c) in (next[ctx] ?? [:]).sorted(by: { $0.value > $1.value }) where c >= 1 && seen.insert(w).inserted {
                 out.append(w)
             }
         }
