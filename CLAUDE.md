@@ -86,6 +86,8 @@ xcrun devicectl device install app --device 00008150-000054D23CF0401C build/Buil
 - Space held 0.45 s → cursor mode (slide moves the cursor, 9 pt per character); a quick swipe on space switches the language.
 - Haptics (`Haptics.swift`): weak 0.45, medium 0.83 (light generator), strong = medium generator 0.8.
 - Next: autocorrect that knows neighbouring keys ("подьзоватлб" → "пользователю" found nothing).
+- Next (Yan, 2026-11-10): after "name@" also offer the domain — the most frequent domains among the contacts'
+  e-mails ("@gmail.com" …), not a fixed list.
 
 ## Homebrew
 - Tap `jandiradmin/homebrew-tap` (`brew tap jandiradmin/tap`, `brew trust jandiradmin/tap`, `brew install --cask exokey`).
