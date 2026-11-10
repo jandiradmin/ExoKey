@@ -955,9 +955,14 @@ final class KeyboardView: UIView {
             // contact names: a beginning ("Вит" → "Виталий") or a slip ("Виталй"); typed with a capital or not a
             // real word → first, else second
             let exactName = allNames.first { $0.lowercased() == word.lowercased() }
-            let nameSlips = word.count >= 3 && !wordIsReal && exactName == nil ? People.slips(word, in: allNames) : []
-            if let n = (nameSlips + nameHits).first(where: { n in !out.contains { $0.lowercased() == n.lowercased() } }) {
-                out.insert(n, at: word.first?.isUppercase == true || !wordIsReal ? 0 : min(1, out.count))
+            // a slip only when nothing in the dictionary starts like this ("мож" is the start of "можно", not "муж")
+            let nameSlips = word.count >= 3 && !wordIsReal && exactName == nil && sg.prefixFreq(key, lang) == 0
+                ? People.slips(word, in: allNames) : []
+            let capital = word.first?.isUppercase == true
+            // typed in lower case: a name only after 3 letters and last ("та" is "так", not "ТАС")
+            let names = nameSlips + (capital || word.count >= 3 ? nameHits : [])
+            if let n = names.first(where: { n in !out.contains { $0.lowercased() == n.lowercased() } }) {
+                if capital || !nameSlips.isEmpty { out.insert(n, at: 0) } else if out.count < 3 { out.append(n) } else { out[2] = n }
                 out = Array(out.prefix(3))
                 KLog.write("name for «\(word)» → \(n)")
             }

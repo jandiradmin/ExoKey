@@ -23,7 +23,8 @@ final class People {
                let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
                 for c in list {
                     let n = c["n"] as? String ?? ""
-                    for part in n.split(separator: " ") where part.count > 1 { set.insert(String(part)) }
+                    // a name is written with a capital: "мойка", "муж" in a contact card are not names
+                    for part in n.split(separator: " ") where part.count > 1 && part.first?.isUppercase == true { set.insert(String(part)) }
                     for e in c["e"] as? [String] ?? [] { emails.append((e, n + " " + (c["k"] as? String ?? ""))) }
                 }
             }
@@ -40,7 +41,11 @@ final class People {
         let t = token.lowercased()
         if t.isEmpty { return emailField ? emails.prefix(3).map(\.email) : [] }
         var out: [String] = []
-        if let at = t.firstIndex(of: "@") {
+        if t.hasPrefix("@"), t.count >= 3, !t.dropFirst().contains("@") {
+            // "@Даша" → Dasha's address (as on the Mac)
+            let who = String(t.dropFirst())
+            out += emails.filter { e in e.name.lowercased().split(separator: " ").contains { $0.hasPrefix(who) } }.map(\.email)
+        } else if let at = t.firstIndex(of: "@") {
             let who = String(t[..<at])
             out += emails.filter { $0.email.lowercased().hasPrefix(t) }.map(\.email)
             if t.hasSuffix("@"), who.count >= 2 {
