@@ -454,8 +454,16 @@ final class KeyboardView: UIView {
         case .ret: ret()
         case .backspace:
             deleteBackward()
+            // held: letters one by one, then (after ~1.5 s) whole words while the finger stays on ⌫
+            let held = CACurrentMediaTime()
             tr.repeatTimer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: false) { [weak self, weak tr] _ in
-                tr?.repeatTimer = Timer.scheduledTimer(withTimeInterval: 0.07, repeats: true) { _ in self?.deleteBackward() }
+                tr?.repeatTimer = Timer.scheduledTimer(withTimeInterval: 0.07, repeats: true) { [weak self, weak tr] _ in
+                    guard let self else { return }
+                    guard CACurrentMediaTime() - held > 1.5 else { self.deleteBackward(); return }
+                    tr?.repeatTimer?.invalidate()
+                    self.deleteWord()
+                    tr?.repeatTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { _ in self.deleteWord() }
+                }
             }
         case .shift: tapShift()
         case .globe: if let e = event { controller?.handleInputModeList(from: cap, with: e) }
@@ -794,6 +802,24 @@ final class KeyboardView: UIView {
         prepareNext()
         lastWasSpace = false
         scheduleRefresh()
+    }
+
+    /// One word back with the spaces / punctuation after it ("привет, мир" → "привет, ").
+    private func deleteWord() {
+        let before = proxy?.documentContextBeforeInput ?? ""
+        guard !before.isEmpty else { return }
+        let tail = before.reversed().prefix { !($0.isLetter || $0.isNumber) }.count
+        let word = before.dropLast(tail).reversed().prefix { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "'" }.count
+        let n = max(1, tail + word)
+        for _ in 0..<n { proxy?.deleteBackward() }
+        localWord = ""
+        prevFix = nil
+        lastCorrection = nil
+        lastWasSpace = false
+        lastKeyAt = CACurrentMediaTime()
+        prepareNext()
+        scheduleRefresh()
+        Haptics.shared.tap(strength: KLog.defaults.object(forKey: "hapticStrength2") as? Int ?? 0)
     }
 
     private func tapShift() {
@@ -1330,6 +1356,7 @@ final class SettingsPanel: UIView {
         let strength = UISegmentedControl(items: ["слабая", "средняя", "сильная"])
         strength.selectedSegmentIndex = d.object(forKey: "hapticStrength2") as? Int ?? 0
         strength.addAction(UIAction { _ in d.set(strength.selectedSegmentIndex, forKey: "hapticStrength2") }, for: .valueChanged)
+        let shortTap = row("Короткая вибрация (чётче)", on: d.object(forKey: "hapticShort") as? Bool ?? true) { d.set($0, forKey: "hapticShort") }
         let btnTest = UIButton(type: .system)
         btnTest.setTitle("Тест: системные кнопки вместо наших клавиш", for: .normal)
         btnTest.contentHorizontalAlignment = .leading
@@ -1344,7 +1371,7 @@ final class SettingsPanel: UIView {
         done.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
         done.addAction(UIAction { [weak self] _ in self?.onClose?() }, for: .touchUpInside)
 
-        let stack = UIStackView(arrangedSubviews: [gTitle, seg, auto, people, calc, vib, strength, note, prev, simple, btnTest, dots, test, log, done])
+        let stack = UIStackView(arrangedSubviews: [gTitle, seg, auto, people, calc, vib, strength, shortTap, note, prev, simple, btnTest, dots, test, log, done])
         stack.axis = .vertical
         stack.spacing = 4
         stack.translatesAutoresizingMaskIntoConstraints = false
