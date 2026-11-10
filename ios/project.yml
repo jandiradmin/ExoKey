@@ -61,6 +61,10 @@ targets:
         buildPhase: resources
       - path: Resources/en.unv
         buildPhase: resources
+      - path: Resources/ru.nam
+        buildPhase: resources
+      - path: Resources/en.nam
+        buildPhase: resources
     entitlements:
       path: Keyboard/Keyboard.entitlements
       properties:

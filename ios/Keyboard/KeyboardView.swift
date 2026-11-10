@@ -738,7 +738,10 @@ final class KeyboardView: UIView {
     /// Worked out in the background while the word was typed: what space would fix it to.
     private var precomputed: (word: String, fix: String?, fixes: [String])?
     private var prevFix: (typed: String, fixes: [String])?
-    private var keepAsTyped = Set<String>()       // words the user took back after a fix: not fixed again
+    /// Words the user took back after a fix ("веб", "Ене"): never fixed again — kept across launches.
+    private var keepAsTyped = Set(KLog.defaults.stringArray(forKey: "keepAsTyped") ?? []) {
+        didSet { KLog.defaults.set(Array(keepAsTyped.suffix(2000)), forKey: "keepAsTyped") }
+    }
     private var autocorrectOn: Bool { KLog.defaults.object(forKey: "autocorrect") as? Bool ?? true }
 
     static func matchCase(_ w: String, _ typed: String) -> String {

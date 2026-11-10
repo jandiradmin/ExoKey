@@ -28,13 +28,19 @@ final class Suggester {
     func isJunk(_ w: String, _ l: KeyboardLang) -> Bool {
         guard unverified(w, l), let d = dict(l) else { return false }
         let f = d.freq(w)
+        // noise in the corpus is a word with a letter missing ("сегодн", "немног", "встетиться"); a real short word
+        // that merely looks like a common one ("веб", "лого" next to "вел", "того") is not noise
         return oneSlip(w, l, [:]).keys.contains { c in
+            guard c.count == w.count + 1 else { return false }
             let fc = d.freq(c)
             return fc > 20 * max(1, f) && !unverified(c, l)
         }
     }
 
     func isReal(_ w: String, _ l: KeyboardLang) -> Bool { freq(w, l) > 0 && !isJunk(w, l) }
+
+    /// A first name or a place in any form ("даша", "дашу", "абакане").
+    func isName(_ w: String, _ l: KeyboardLang) -> Bool { WordSet.names(l)?.contains(w) ?? false }
     func prefixFreq(_ p: String, _ l: KeyboardLang) -> Int { dict(l)?.prefixFreq(p) ?? 0 }
 
     /// Keys next to each letter on screen: a slip to a neighbour is the usual typo.
@@ -48,6 +54,7 @@ final class Suggester {
         // a typed form the spelling dictionary doesn't confirm counts as not a word ("сегодн")
         // a finished word: a real but rare form ("аишу" — a name's form) yields only to a word that is far more
         // common one slip away (×1000: "пишу"); a common real word ("отдача", "пробую") stays as typed
+        if final, isName(key, lang) { return [] }        // "даша" is not a typo of "дала"
         let typedMass = max(1, final ? (isJunk(key, lang) ? 0 : d.freq(key)) : d.prefixFreq(key))
         // how much more common a fix must be: a likelier slip needs less (a neighbour key ×50, a far key ×400)
         func enough(_ f: Int, _ weight: Double) -> Bool {
@@ -126,6 +133,8 @@ final class Suggester {
     func autocorrect(_ word: String, lang: KeyboardLang, near: Neighbors, finalFixes: [(w: String, s: Double, p: Double)]? = nil) -> String? {
         guard word.count >= 3, word.allSatisfy({ $0.isLetter }), word.dropFirst().allSatisfy({ $0.isLowercase }) else { return nil }
         let key = norm(word, lang)
+        // a real word is never replaced by itself, however rare ("веб", "лого"): only offered on the "↩" button
+        guard !isReal(key, lang), !isName(key, lang) else { return nil }
         let list = finalFixes ?? fixes(key, lang: lang, near: near, final: true)
         // only into a real, common word (the dictionary also has rare noise like "пожав", "немног")
         // and only by a likely slip: a neighbour key, swapped / missed / doubled letter, a letter for the space

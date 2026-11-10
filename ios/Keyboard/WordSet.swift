@@ -48,4 +48,15 @@ final class WordSet {
     }()
 
     static func unverified(_ l: KeyboardLang) -> WordSet? { sets[l] }
+
+    /// First names and place names (lower case, all forms: "даша", "дашу"), never "fixed" into other words.
+    private static let nameSets: [KeyboardLang: WordSet] = {
+        var r: [KeyboardLang: WordSet] = [:]
+        for l in [KeyboardLang.ru, .en] {
+            if let u = Bundle.main.url(forResource: l.rawValue, withExtension: "nam"), let s = WordSet(url: u) { r[l] = s }
+        }
+        return r
+    }()
+
+    static func names(_ l: KeyboardLang) -> WordSet? { nameSets[l] }
 }
