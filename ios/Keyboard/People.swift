@@ -61,5 +61,24 @@ final class People {
         return names.filter { $0.lowercased().hasPrefix(l) && $0.count > w.count }.sorted { $0.count < $1.count }
     }
 
+    /// Contact names one typing slip away (a letter wrong, missed, extra or two swapped): "Виталй" → "Виталий".
+    /// Static over a copy of `names`, so it runs on the suggestion queue.
+    static func slips(_ w: String, in names: [String]) -> [String] {
+        let a = Array(w.lowercased())
+        guard a.count >= 3 else { return [] }
+        return names.filter { n in
+            let b = Array(n.lowercased())
+            guard abs(a.count - b.count) <= 1, a != b, a.first == b.first || a.count == b.count else { return false }
+            if a.count == b.count {
+                let d = (0..<a.count).filter { a[$0] != b[$0] }
+                return d.count == 1 || (d.count == 2 && d[1] == d[0] + 1 && a[d[0]] == b[d[1]] && a[d[1]] == b[d[0]])
+            }
+            let (s, l) = a.count < b.count ? (a, b) : (b, a)
+            var i = 0
+            while i < s.count, s[i] == l[i] { i += 1 }
+            return Array(s[i...]) == Array(l[(i + 1)...])
+        }
+    }
+
     func isName(_ w: String) -> Bool { let l = w.lowercased(); return names.contains { $0.lowercased() == l } }
 }

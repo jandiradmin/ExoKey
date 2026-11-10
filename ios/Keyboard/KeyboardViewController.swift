@@ -46,6 +46,7 @@ final class KeyboardViewController: UIInputViewController {
     // (⌫ and ф arrived 120–180 ms late instead of ~25 ms) — keys must not wait for that.
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        KLog.write("field type=\(textDocumentProxy.keyboardType?.rawValue ?? -1) content=\(textDocumentProxy.textContentType?.rawValue ?? "-")")
         var v: UIView? = view
         while let cur = v {
             for g in cur.gestureRecognizers ?? [] where g.delaysTouchesBegan { g.delaysTouchesBegan = false }

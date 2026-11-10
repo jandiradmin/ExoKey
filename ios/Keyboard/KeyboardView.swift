@@ -606,7 +606,7 @@ final class KeyboardView: UIView {
     private func ret() {
         // the last word of a line is learned too ("утро всем⏎")
         let before = proxy?.documentContextBeforeInput ?? ""
-        if before.last?.isLetter == true { NGrams.shared.learn(NGrams.sentenceWords(before)) }
+        if before.last?.isLetter == true { learnLastWord(before) }
         proxy?.insertText("\n")
         localWord = ""
         lastCorrection = nil
@@ -666,7 +666,7 @@ final class KeyboardView: UIView {
         // and the fix (if any) comes on the "previous word" button
         let fix = ready?.fix
         if ready == nil, typed.count >= 3, autocorrectOn, !Self.simple { offerPreviousFix(typed) }
-        if autocorrectOn, !Self.simple, !typed.isEmpty, !keepAsTyped.contains(typed.lowercased()), !People.shared.isName(typed), let fix {
+        if autocorrectOn, !Self.simple, !typed.isEmpty, !keepAsTyped.contains(typed.lowercased()), let fix, !People.shared.isName(typed) || fix.lowercased() == typed.lowercased() {
             let shown = Self.matchCase(fix, typed)
             replaceTail(typed, with: shown)
             before = String(before.dropLast(typed.count)) + shown
@@ -678,7 +678,7 @@ final class KeyboardView: UIView {
             prevFix = (typed, r.fixes.map { Self.matchCase($0, typed) })
             setChip(typed, Self.matchCase(r.fixes[0], typed))
         }
-        if !typed.isEmpty { NGrams.shared.learn(NGrams.sentenceWords(before)) }
+        learnLastWord(before)
         let after: String
         // double space → ". " after a word
         if lastWasSpace, before.hasSuffix(" "), let c = before.dropLast().last, c.isLetter || c.isNumber {
@@ -726,6 +726,22 @@ final class KeyboardView: UIView {
     }
 
     /// Replaces the word somewhere before the cursor and puts the cursor back where it was.
+    /// Learns the word just finished after the ones before it — only a real word, a contact name or a word the
+    /// user kept: a typo ("галости") is not a habit.
+    private func learnLastWord(_ before: String) {
+        let ws = NGrams.sentenceWords(before)
+        guard let w = ws.last, knownWord(w) else { return }
+        NGrams.shared.learn(ws)
+    }
+
+    private func knownWord(_ w: String) -> Bool {
+        let l = w.lowercased()
+        if keepAsTyped.contains(l) || People.shared.isName(l) { return true }
+        let lang: KeyboardLang = l.unicodeScalars.contains { (0x400...0x4FF).contains($0.value) } ? .ru : .en
+        let s = Suggester.main, k = s.norm(l, lang)
+        return s.isReal(k, lang) || s.isName(k, lang)
+    }
+
     private func applyChip() {
         guard let c = chip else { return }
         clearChip()
@@ -899,8 +915,10 @@ final class KeyboardView: UIView {
         // after a space: the next word (and a short phrase) the user usually writes here
         if word.isEmpty, !symbolsMode, !Self.simple, ctx.last == " " {
             let words = NGrams.sentenceWords(ctx)
-            var next = NGrams.shared.predict(after: words).map { Self.matchCase($0, ctx.trimmingCharacters(in: .whitespaces).last.map { ".!?".contains($0) } == true ? "A" : "a") }
-            if let ph = NGrams.shared.phrase(after: words), let first = next.first, ph.hasPrefix(first.lowercased() + " ") {
+            var next = NGrams.shared.predict(after: words, limit: 6).filter { knownWord($0) }.prefix(3).map { w in
+                People.shared.names.first { $0.lowercased() == w } ?? w }.map { Self.matchCase($0, ctx.trimmingCharacters(in: .whitespaces).last.map { ".!?".contains($0) } == true ? "A" : "a") }
+            if let ph = NGrams.shared.phrase(after: words), let first = next.first, ph.hasPrefix(first.lowercased() + " "),
+               ph.split(separator: " ").allSatisfy({ knownWord(String($0)) }) {
                 next[0] = Self.matchCase(ph, next[0])
             }
             if !next.isEmpty {
@@ -913,7 +931,7 @@ final class KeyboardView: UIView {
         }
         // e-mails: "vit@" → the contact's address; in an e-mail field — any beginning
         let token = String(ctx.reversed().prefix { !$0.isWhitespace }.reversed())
-        let emailField = proxy?.keyboardType == .emailAddress
+        let emailField = proxy?.keyboardType == .emailAddress || proxy?.textContentType == .emailAddress || proxy?.textContentType == .username
         if let e = People.shared.emails(for: token, emailField: emailField).first {
             emailToken = token
             bar.showWide(e)
@@ -922,7 +940,7 @@ final class KeyboardView: UIView {
             return
         }
         emailToken = nil
-        let nameHits = People.shared.names(startingWith: word)
+        let nameHits = People.shared.names(startingWith: word), allNames = People.shared.names
         guard word.count >= 1, !symbolsMode else { bar.show([], typed: ""); lastShown = []; latest.bump(); return }
         let before = String(ctx.dropLast(word.count))
         let lang = self.lang, gender = self.gender, near = self.neighbors
@@ -931,18 +949,30 @@ final class KeyboardView: UIView {
             guard let self, self.latest.is(id) else { return }      // a newer key already came
             let t0 = Date()
             var out = Suggester.shared.suggest(word: word, before: before, lang: lang, gender: gender, near: near)
-            // contact names: first when the word starts with a capital, else second
-            if word.first?.isUppercase == true, let n = nameHits.first, !out.contains(where: { $0.lowercased() == n.lowercased() }) {
-                out.insert(n, at: 0)
-                out = Array(out.prefix(3))
-            }
             let sg = Suggester.shared
             let key = sg.norm(word, lang)
+            let wordIsReal = sg.isReal(key, lang)
+            // contact names: a beginning ("Вит" → "Виталий") or a slip ("Виталй"); typed with a capital or not a
+            // real word → first, else second
+            let exactName = allNames.first { $0.lowercased() == word.lowercased() }
+            let nameSlips = word.count >= 3 && !wordIsReal && exactName == nil ? People.slips(word, in: allNames) : []
+            if let n = (nameSlips + nameHits).first(where: { n in !out.contains { $0.lowercased() == n.lowercased() } }) {
+                out.insert(n, at: word.first?.isUppercase == true || !wordIsReal ? 0 : min(1, out.count))
+                out = Array(out.prefix(3))
+                KLog.write("name for «\(word)» → \(n)")
+            }
             // what space would do with this word: worked out here, never on the key press itself
             let finalFixes = sg.fixes(key, lang: lang, near: near, final: true, deep: true)
-            let fix = sg.autocorrect(word, lang: lang, near: near, finalFixes: finalFixes)
+            var fix = sg.autocorrect(word, lang: lang, near: near, finalFixes: finalFixes)
             // the "↩" button only for a likely slip (not "кей" → "ей": dropping the first letter)
-            let fixes = finalFixes.filter { $0.p >= 0.25 || $0.w.contains(" ") }.prefix(3).map(\.w)
+            var fixes = Array(finalFixes.filter { $0.p >= 0.25 || $0.w.contains(" ") }.prefix(3).map(\.w))
+            // a contact name that isn't a dictionary word: written as in the contacts ("даша" → "Даша"), and
+            // a slip with only one such name nearby is fixed to it
+            if fix == nil, word.count >= 3, !wordIsReal {
+                if let e = exactName, e != word, word != word.uppercased() { fix = e }
+                else if nameSlips.count == 1, fixes.isEmpty { fix = nameSlips[0] }
+            }
+            if fixes.isEmpty { fixes = Array(nameSlips.prefix(3)) }
             if word.first?.isUppercase == true {
                 out = out.map { $0.first?.isUppercase == true ? $0 : word == word.uppercased() && word.count > 1 ? $0.uppercased() : $0.prefix(1).uppercased() + $0.dropFirst() }
             }
