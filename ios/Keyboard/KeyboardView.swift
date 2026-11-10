@@ -675,6 +675,7 @@ final class KeyboardView: UIView {
             prevFix = (typed, r.fixes.map { Self.matchCase($0, typed) })
             setChip(typed, Self.matchCase(r.fixes[0], typed))
         }
+        if !typed.isEmpty { NGrams.shared.learn(NGrams.sentenceWords(before)) }
         let after: String
         // double space → ". " after a word
         if lastWasSpace, before.hasSuffix(" "), let c = before.dropLast().last, c.isLetter || c.isNumber {
@@ -892,6 +893,21 @@ final class KeyboardView: UIView {
         // phrases from Apple's model: off — asking the system whether the model is ready froze the keyboard
         // for 0.45–0.85 s after every space (the log: "MAIN STALL … after refresh"), and the model is unavailable here
         if word.isEmpty, let pf = prevFix, ctx.hasSuffix(pf.typed + " ") { bar.show(pf.fixes, typed: ""); lastShown = pf.fixes; return }
+        // after a space: the next word (and a short phrase) the user usually writes here
+        if word.isEmpty, !symbolsMode, !Self.simple, ctx.last == " " {
+            let words = NGrams.sentenceWords(ctx)
+            var next = NGrams.shared.predict(after: words).map { Self.matchCase($0, ctx.trimmingCharacters(in: .whitespaces).last.map { ".!?".contains($0) } == true ? "A" : "a") }
+            if let ph = NGrams.shared.phrase(after: words), let first = next.first, ph.hasPrefix(first.lowercased() + " ") {
+                next[0] = Self.matchCase(ph, next[0])
+            }
+            if !next.isEmpty {
+                latest.bump()
+                bar.show(next, typed: "")
+                lastShown = next
+                KLog.write("next after «\(words.suffix(2).joined(separator: " "))» → \(next)")
+                return
+            }
+        }
         // e-mails: "vit@" → the contact's address; in an e-mail field — any beginning
         let token = String(ctx.reversed().prefix { !$0.isWhitespace }.reversed())
         let emailField = proxy?.keyboardType == .emailAddress
@@ -930,6 +946,11 @@ final class KeyboardView: UIView {
             let ms = Int(Date().timeIntervalSince(t0) * 1000)
             DispatchQueue.main.async {
                 guard self.latest.is(id) else { return }
+                let prev = NGrams.sentenceWords(before)
+                let habit = out.map { NGrams.shared.count(of: $0.lowercased(), after: prev) }
+                if habit.contains(where: { $0 > 0 }) {
+                    out = zip(out, habit).enumerated().sorted { ($0.element.1, -$0.offset) > ($1.element.1, -$1.offset) }.map { $0.element.0 }
+                }
                 self.precomputed = (word, fix, Array(fixes))
                 self.lastShown = out
                 self.bar.show(out, typed: word)
@@ -1027,6 +1048,9 @@ final class KeyboardView: UIView {
         }
         localWord = ""
         proxy?.insertText(s + " ")
+        let ctxNow = (proxy?.documentContextBeforeInput ?? "")
+        let ws = NGrams.sentenceWords(ctxNow)
+        for i in max(1, ws.count - s.split(separator: " ").count + 1)...max(1, ws.count) { NGrams.shared.learn(Array(ws.prefix(i))) }
         lastWasSpace = true
         if shift == .once { shift = .off; shiftIsAuto = false; refreshTitles() }
         autoShift()

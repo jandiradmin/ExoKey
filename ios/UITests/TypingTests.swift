@@ -253,4 +253,19 @@ final class TypingTests: XCTestCase {
         if seen { chip.tap(); sleep(1) }
         print("ROBOT chip: text after «\(text(f))»")
     }
+
+    /// The keyboard learns what the user writes next: after "доброе утро" twice, "доброе " suggests "утро".
+    func test9_learnsNextWord() {
+        let f = field()
+        f.tap()
+        sleep(1)
+        ensureRussian()
+        _ = typeFast("доброе утро всем. доброе утро всем. доброе ", every: 0.2, hold: 0.08, f)
+        sleep(1)
+        let shown = app.buttons.allElementsBoundByIndex.map(\.label).filter { !$0.isEmpty }.prefix(12)
+        print("ROBOT next: bar «\(shown.joined(separator: " | "))», text «\(text(f))»")
+        let ph = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "утро")).firstMatch
+        if ph.exists { ph.tap(); sleep(1) }
+        print("ROBOT next: after tap «\(text(f))»")
+    }
 }
