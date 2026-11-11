@@ -44,7 +44,7 @@ struct ContentView: View {
                 } header: {
                     Text("Имена и e-mail")
                 } footer: {
-                    Text("Имена и адреса остаются на iPhone. Клавиатура подсказывает адрес, когда набираете «имя@» или пишете в поле e-mail.")
+                    Text("Имена и адреса остаются на iPhone. Клавиатура подсказывает адрес, когда набираете «имя@» или пишете в поле e-mail; «@Имя» — карточка контакта: что вставить (имя, телефон, e-mail, компания). После изменений в контактах нажмите «Подключить контакты» ещё раз.")
                 }
                 Section("Проверка") {
                     TextField("Печатайте здесь", text: $text, axis: .vertical)
@@ -76,12 +76,16 @@ struct ContentView: View {
                 DispatchQueue.main.async { contactsStatus = "Нет доступа: Настройки → ExoKey → Контакты" }
                 return
             }
-            let keys = [CNContactGivenNameKey, CNContactFamilyNameKey, CNContactNicknameKey, CNContactEmailAddressesKey] as [CNKeyDescriptor]
+            let keys = [CNContactGivenNameKey, CNContactFamilyNameKey, CNContactNicknameKey, CNContactEmailAddressesKey,
+                        CNContactPhoneNumbersKey, CNContactOrganizationNameKey] as [CNKeyDescriptor]
             var list: [SharedContact] = []
             try? store.enumerateContacts(with: CNContactFetchRequest(keysToFetch: keys)) { c, _ in
                 let name = [c.givenName, c.familyName].filter { !$0.isEmpty }.joined(separator: " ")
                 let emails = c.emailAddresses.map { String($0.value) }
-                if !name.isEmpty || !emails.isEmpty { list.append(SharedContact(n: name, k: c.nickname, e: emails)) }
+                let phones = c.phoneNumbers.map { $0.value.stringValue }
+                if !name.isEmpty || !emails.isEmpty || !c.organizationName.isEmpty {
+                    list.append(SharedContact(n: name, k: c.nickname, e: emails, p: phones, o: c.organizationName))
+                }
             }
             if let url = Shared.contactsURL, let data = try? JSONEncoder().encode(list) { try? data.write(to: url) }
             DispatchQueue.main.async { refreshStatus() }
@@ -93,4 +97,6 @@ struct SharedContact: Codable {
     let n: String      // name
     let k: String      // nickname
     let e: [String]    // e-mails
+    var p: [String]? = nil   // phones
+    var o: String? = nil     // company
 }

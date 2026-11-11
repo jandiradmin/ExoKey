@@ -6,6 +6,8 @@ final class People {
     static let shared = People()
     private(set) var names: [String] = []                 // display forms: "Виталий", "Ткачишин"
     private(set) var emails: [(email: String, name: String)] = []
+    struct Contact { let name: String; let phones: [String]; let emails: [String]; let company: String; let tokens: [String] }
+    private(set) var contacts: [Contact] = []
 
     func reload(_ controller: UIInputViewController) {
         guard KLog.defaults.object(forKey: "contacts") as? Bool ?? true else { names = []; emails = []; return }
@@ -15,6 +17,7 @@ final class People {
                 set.insert(e.userInput)
             }
             var emails: [(String, String)] = []
+            var contacts: [Contact] = []
             let mine = (KLog.defaults.string(forKey: "myEmails") ?? "")
                 .split(whereSeparator: { $0 == "," || $0 == " " || $0 == ";" }).map(String.init).filter { $0.contains("@") }
             emails += mine.map { ($0, "") }
@@ -23,6 +26,12 @@ final class People {
                let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
                 for c in list {
                     let n = c["n"] as? String ?? ""
+                    let o = c["o"] as? String ?? ""
+                    let full = n.isEmpty ? o : n
+                    if !full.isEmpty {
+                        let toks = (full.split(separator: " ").map(String.init) + [c["k"] as? String ?? "", o]).map(Self.norm).filter { !$0.isEmpty }
+                        contacts.append(Contact(name: full, phones: c["p"] as? [String] ?? [], emails: c["e"] as? [String] ?? [], company: o, tokens: toks))
+                    }
                     // a name is written with a capital: "мойка", "муж" in a contact card are not names
                     for part in n.split(separator: " ") where part.count > 1 && part.first?.isUppercase == true { set.insert(String(part)) }
                     for e in c["e"] as? [String] ?? [] { emails.append((e, n + " " + (c["k"] as? String ?? ""))) }
@@ -31,6 +40,7 @@ final class People {
             DispatchQueue.main.async {
                 self?.names = Array(set)
                 self?.emails = emails
+                self?.contacts = contacts
                 KLog.write("people: names=\(set.count) emails=\(emails.count) mine=\(mine.count)")
             }
         }
@@ -41,10 +51,8 @@ final class People {
         let t = token.lowercased()
         if t.isEmpty { return emailField ? emails.prefix(3).map(\.email) : [] }
         var out: [String] = []
-        if t.hasPrefix("@"), t.count >= 3, !t.dropFirst().contains("@") {
-            // "@Даша" → Dasha's address (as on the Mac)
-            let who = String(t.dropFirst())
-            out += emails.filter { e in e.name.lowercased().split(separator: " ").contains { $0.hasPrefix(who) } }.map(\.email)
+        if t.hasPrefix("@") {
+            return []
         } else if let at = t.firstIndex(of: "@") {
             let who = String(t[..<at])
             out += emails.filter { $0.email.lowercased().hasPrefix(t) }.map(\.email)
@@ -83,6 +91,18 @@ final class People {
             while i < s.count, s[i] == l[i] { i += 1 }
             return Array(s[i...]) == Array(l[(i + 1)...])
         }
+    }
+
+    static func norm(_ s: String) -> String { s.lowercased().replacingOccurrences(of: "ё", with: "е") }
+
+    /// "@мар" → the contacts with a name, nickname or company starting so (first names first).
+    func matching(_ q: String) -> [Contact] {
+        let q = Self.norm(q)
+        guard !q.isEmpty else { return [] }
+        return contacts.compactMap { c -> (Int, Contact)? in
+            guard let i = c.tokens.firstIndex(where: { $0.hasPrefix(q) }) else { return nil }
+            return (i, c)
+        }.sorted { $0.0 != $1.0 ? $0.0 < $1.0 : $0.1.name.localizedCompare($1.1.name) == .orderedAscending }.map(\.1)
     }
 
     func isName(_ w: String) -> Bool { let l = w.lowercased(); return names.contains { $0.lowercased() == l } }

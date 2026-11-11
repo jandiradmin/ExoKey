@@ -955,8 +955,24 @@ final class KeyboardView: UIView {
                 return
             }
         }
-        // e-mails: "vit@" → the contact's address; in an e-mail field — any beginning
         let token = String(ctx.reversed().prefix { !$0.isWhitespace }.reversed())
+        // "@Марина": the matching contacts; a tap opens the card with what to insert
+        if token.hasPrefix("@"), token.count >= 2, !token.dropFirst().contains("@") {
+            let hits = People.shared.matching(String(token.dropFirst()))
+            if !hits.isEmpty {
+                contactToken = token
+                // the same name twice: the full names tell them apart
+                contactHits = Array(hits.prefix(3))
+                let titles = contactHits.map(\.name)
+                latest.bump()
+                bar.show(titles, typed: "")
+                lastShown = titles
+                KLog.write("contacts for «\(token)» → \(hits.count)")
+                return
+            }
+        }
+        contactToken = nil
+        // e-mails: "vit@" → the contact's address; in an e-mail field — any beginning
         let emailField = proxy?.keyboardType == .emailAddress || proxy?.textContentType == .emailAddress || proxy?.textContentType == .username
         if let e = People.shared.emails(for: token, emailField: emailField).first {
             emailToken = token
@@ -982,11 +998,18 @@ final class KeyboardView: UIView {
             // real word → first, else second
             let exactName = allNames.first { $0.lowercased() == word.lowercased() }
             // a slip only when nothing in the dictionary starts like this ("мож" is the start of "можно", not "муж")
-            let nameSlips = word.count >= 3 && !wordIsReal && exactName == nil && sg.prefixFreq(key, lang) == 0
-                ? People.slips(word, in: allNames) : []
             let capital = word.first?.isUppercase == true
+            // a contact "name" that is an ordinary word ("Менеджер", "Полис", "Правда") is not offered; typed in
+            // lower case, only real first names (not surnames, firms: "коп" ≠ "Копытин")
+            func offer(_ n: String) -> Bool {
+                let k = sg.norm(n, lang)
+                if sg.isName(k, lang) { return true }
+                return capital && !sg.isReal(k, lang)
+            }
+            let nameSlips = word.count >= 3 && !wordIsReal && exactName == nil && sg.prefixFreq(key, lang) == 0
+                ? People.slips(word, in: allNames).filter(offer) : []
             // typed in lower case: a name only after 3 letters and last ("та" is "так", not "ТАС")
-            let names = nameSlips + (capital || word.count >= 3 ? nameHits : [])
+            let names = nameSlips + (capital || word.count >= 3 ? nameHits.filter(offer) : [])
             if let n = names.first(where: { n in !out.contains { $0.lowercased() == n.lowercased() } }) {
                 if capital || !nameSlips.isEmpty { out.insert(n, at: 0) } else if out.count < 3 { out.append(n) } else { out[2] = n }
                 out = Array(out.prefix(3))
@@ -1046,6 +1069,29 @@ final class KeyboardView: UIView {
     }
 
     private var emailToken: String?
+    private var contactToken: String?
+    private var contactHits: [People.Contact] = []
+    private var card: ContactCard?
+
+    private func openCard(_ c: People.Contact, token: String) {
+        card?.removeFromSuperview()
+        let v = ContactCard(c)
+        v.onClose = { [weak self] in self?.card?.removeFromSuperview(); self?.card = nil }
+        v.onInsert = { [weak self] text in
+            guard let self else { return }
+            self.card?.removeFromSuperview(); self.card = nil
+            if (self.proxy?.documentContextBeforeInput ?? "").hasSuffix(token) { for _ in token { self.proxy?.deleteBackward() } }
+            self.proxy?.insertText(text + " ")
+            self.localWord = ""
+            self.contactToken = nil
+            KLog.write("contact inserted (\(text.split(separator: ",").count) fields)")
+            self.scheduleRefresh()
+        }
+        v.frame = bounds
+        v.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        addSubview(v)
+        card = v
+    }
     private var lastKeyAt: CFTimeInterval = 0
     private var revisit: (before: String, after: String, fixes: [String])?
 
@@ -1090,6 +1136,10 @@ final class KeyboardView: UIView {
             localWord = ""
             KLog.write("revisit fixed «\(r.before + r.after)» → «\(s)»")
             scheduleRefresh()
+            return
+        }
+        if let t = contactToken, let c = contactHits.first(where: { $0.name == s }) {
+            openCard(c, token: t)
             return
         }
         if let t = emailToken {

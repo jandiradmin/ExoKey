@@ -46,12 +46,15 @@ final class NGrams {
     }
 
     /// Next words after the sentence so far, most likely first: the last two words, then the last one.
-    /// Already after the first time (the bar is empty after a space anyway); more frequent ones go first.
+    /// Seen at least twice and a good share of the times; more frequent ones go first.
     func predict(after words: [String], limit: Int = 3) -> [String] {
         var out: [String] = []
         var seen = Set<String>()
         func add(_ ctx: String) {
-            for (w, c) in (next[ctx] ?? [:]).sorted(by: { $0.value > $1.value }) where c >= 1 && seen.insert(w).inserted {
+            let m = next[ctx] ?? [:], total = m.values.reduce(0, +)
+            // a habit: written here at least twice and at least a quarter of the times
+            // (once is chance: "for it" → "possible to", "на" → "траве")
+            for (w, c) in m.sorted(by: { $0.value > $1.value }) where c >= 2 && c * 4 >= total && seen.insert(w).inserted {
                 out.append(w)
             }
         }
