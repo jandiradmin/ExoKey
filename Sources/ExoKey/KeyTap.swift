@@ -46,6 +46,7 @@ private func keyTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CG
         return Unmanaged.passUnretained(event)
     case .keyDown:
         if Injector.isOwn(event) { return Unmanaged.passUnretained(event) }
+        Injector.noteReal(event)
         if Engine.shared.keyDown(event) == .swallow {
             if !Injector.lastWasAccept { DispatchQueue.main.async { Predictor.shared.keyTyped(code: -1, typed: nil) } }
             Injector.lastWasAccept = false

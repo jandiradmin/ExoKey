@@ -8,8 +8,21 @@ enum Injector {
 
     static func isOwn(_ e: CGEvent) -> Bool { e.getIntegerValueField(.eventSourceUserData) == tag }
 
+    /// Keyboard type of the last real key press. Synthetic events must carry it: an event with another
+    /// keyboard's type (e.g. the built-in ISO one) makes macOS treat an external ANSI keyboard as ISO,
+    /// and its ` key starts typing § / ±.
+    private static var kbdType: Int64 = 0
+
+    static func noteReal(_ e: CGEvent) {
+        let t = e.getIntegerValueField(.keyboardEventKeyboardType)
+        guard t != 0, t != kbdType else { return }
+        kbdType = t
+        Log.write("keyboard type -> \(t)")
+    }
+
     private static func post(_ e: CGEvent) {
         e.setIntegerValueField(.eventSourceUserData, value: tag)
+        if kbdType != 0 { e.setIntegerValueField(.keyboardEventKeyboardType, value: kbdType) }
         e.post(tap: .cghidEventTap)
     }
 
