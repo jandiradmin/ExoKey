@@ -6,6 +6,8 @@
 	<string>ExoKey</string>
 	<key>CFBundleExecutable</key>
 	<string>ExoKey</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>app.exokey.ExoKey</string>
 	<key>CFBundleName</key>
