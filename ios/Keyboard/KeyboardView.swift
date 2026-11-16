@@ -131,10 +131,10 @@ final class KeyboardView: UIView {
     private var lastWasSpace = false
 
     private var caps: [[KeyCap]] = []
-    private var keyTop: CGFloat = 0
+    /// Top of every key row, plus the bottom of the last one.
+    private var rowTops: [CGFloat] = [0]
     private var needNeighbors = true
     private var lastLayoutSize = CGSize.zero
-    private var keyRowH: CGFloat = 1
 
     // touch state
     private final class Track {
@@ -248,9 +248,12 @@ final class KeyboardView: UIView {
         let w = bounds.width, h = bounds.height
         bar.frame = CGRect(x: 0, y: 0, width: w, height: Self.barHeight)
         let side: CGFloat = 3, top: CGFloat = Self.barHeight + 2, bottom: CGFloat = 4
-        let rowH = (h - top - bottom) / CGFloat(max(1, caps.count))
-        keyTop = top
-        keyRowH = rowH
+        // row heights: the digits row is lower (as in SwiftKey)
+        let weights = caps.map { $0.first?.key.isDigit == true ? Layouts.digitsRowWeight : 1 }
+        let rowH = (h - top - bottom) / max(1, weights.reduce(0, +))
+        var ys: [CGFloat] = [top]
+        for wgt in weights { ys.append(ys.last! + wgt * rowH) }
+        rowTops = ys
         // the first layout pass is full-screen, before the keyboard gets its height: redo neighbours on resize
         if bounds.size != lastLayoutSize { lastLayoutSize = bounds.size; needNeighbors = true }
         defer {
@@ -266,9 +269,13 @@ final class KeyboardView: UIView {
             }
         }
         let gapX: CGFloat = w > 600 ? 10 : 6, gapY: CGFloat = rowH > 50 ? 12 : 10
-        let g = Layouts.grid
-        let unit = (w - 2 * side) / g
+        // letter rows: their own grid (10 in English, 11 in Russian); digits and the bottom row: 11
+        let letterRows = caps.filter { r in r.first?.key.isDigit != true && !r.contains { $0.key.kind == .space } }
+        let letterGrid = Layouts.grid(letterRows.map { $0.map(\.key) })
         for (r, row) in caps.enumerated() {
+            let g = letterRows.contains { $0.first === row.first } ? letterGrid : Layouts.grid
+            let unit = (w - 2 * side) / g
+            let y = ys[r] + gapY / 2, kh = ys[r + 1] - ys[r] - gapY
             let fixed = row.filter { $0.key.kind != .space }.reduce(0) { $0 + $1.key.width }
             let flex: CGFloat = row.contains { $0.key.kind == .space } ? max(3, g - fixed) : 0
             let total = fixed + flex
@@ -280,18 +287,18 @@ final class KeyboardView: UIView {
                 let inner = row.dropFirst().dropLast()
                 let innerW = inner.reduce(0) { $0 + $1.key.width } * u
                 let sw = row.first!.key.width * u, bw = row.last!.key.width * u
-                row.first!.frame = CGRect(x: side + gapX / 2, y: top + CGFloat(r) * rowH + gapY / 2, width: sw - gapX, height: rowH - gapY)
-                row.last!.frame = CGRect(x: w - side - bw + gapX / 2, y: top + CGFloat(r) * rowH + gapY / 2, width: bw - gapX, height: rowH - gapY)
+                row.first!.frame = CGRect(x: side + gapX / 2, y: y, width: sw - gapX, height: kh)
+                row.last!.frame = CGRect(x: w - side - bw + gapX / 2, y: y, width: bw - gapX, height: kh)
                 x = (w - innerW) / 2
                 for cap in inner {
-                    cap.frame = CGRect(x: x + gapX / 2, y: top + CGFloat(r) * rowH + gapY / 2, width: cap.key.width * u - gapX, height: rowH - gapY)
+                    cap.frame = CGRect(x: x + gapX / 2, y: y, width: cap.key.width * u - gapX, height: kh)
                     x += cap.key.width * u
                 }
                 continue
             }
             for cap in row {
                 let kw = (cap.key.kind == .space ? flex : cap.key.width) * u
-                cap.frame = CGRect(x: x + gapX / 2, y: top + CGFloat(r) * rowH + gapY / 2, width: kw - gapX, height: rowH - gapY)
+                cap.frame = CGRect(x: x + gapX / 2, y: y, width: kw - gapX, height: kh)
                 x += kw
             }
         }
@@ -301,7 +308,7 @@ final class KeyboardView: UIView {
     private func cap(at p: CGPoint) -> KeyCap? {
         guard !caps.isEmpty else { return nil }
         guard p.y >= Self.barHeight else { return nil }
-        let r = min(caps.count - 1, max(0, Int((p.y - keyTop) / keyRowH)))
+        let r = min(caps.count - 1, max(0, (rowTops.lastIndex { $0 <= p.y } ?? 0)))
         return caps[r].min { abs($0.frame.midX - p.x) - $0.frame.width / 2 < abs($1.frame.midX - p.x) - $1.frame.width / 2 }
     }
 
