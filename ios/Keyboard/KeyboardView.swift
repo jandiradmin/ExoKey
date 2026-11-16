@@ -149,6 +149,7 @@ final class KeyboardView: UIView {
         var downAt: TimeInterval = 0     // when the finger touched the glass (not when iOS delivered it)
         var last: CGPoint = .zero        // where this finger was seen last (to tell it from another finger)
         var cursorMode = false           // space held: sliding the finger moves the cursor
+        var spacePending = false         // space bar down: the space goes in on lift if it was a tap, not a slide
         var moves = 0                    // separate small steps of the finger (a slide), not one jump
         var cursorX: CGFloat = 0         // finger position at the last cursor step
         init(cap: KeyCap, start: CGPoint) { self.cap = cap; self.start = start }
@@ -429,8 +430,10 @@ final class KeyboardView: UIView {
         lastOtherDown = t.timestamp
         showTouch(at: p, changed: chosen !== cap)
         KLog.write("↓\(chosen.debugName) late=\(Int((CACurrentMediaTime() - t.timestamp) * 1000))ms fingers=\(tracks.count)")
-        // another finger lands: a long press under the first one isn't a long press any more
+        // another finger lands: a long press under the first one isn't a long press any more;
+        // a space still under a finger (fast typing) goes in now, before this key
         for other in tracks.values {
+            if other.spacePending { other.spacePending = false; space() }
             other.longTimer?.invalidate()
             if let popup = other.popup, !popup.moved { popup.removeFromSuperview(); other.popup = nil }
         }
@@ -451,10 +454,11 @@ final class KeyboardView: UIView {
                 }
             }
         case .space:
-            space()
+            // nothing is typed yet: a slide along the bar switches the language and must not leave a space
+            tr.spacePending = true
             // held still: the space bar becomes a trackpad for the cursor, as in the system keyboard
             tr.longTimer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: false) { [weak self, weak tr] _ in
-                guard let self, let tr, self.tracks.values.contains(where: { $0 === tr }),
+                guard let self, let tr, tr.spacePending, self.tracks.values.contains(where: { $0 === tr }),
                       abs(tr.last.x - tr.start.x) < 12, abs(tr.last.y - tr.start.y) < 20 else { return }
                 self.startCursorMode(tr)
             }
@@ -510,14 +514,20 @@ final class KeyboardView: UIView {
         if tr.cursorMode { endCursorMode(); return }
         switch tr.cap.key.kind {
         case .space:
-            // a swipe along the space bar switches the language (the space typed on touch-down is taken back)
-            // a slide is several small steps of the finger along the bar; a thumb flattening on a quick tap
+            // already typed when the next key came down (fast typing)
+            guard tr.spacePending else { break }
+            // a swipe along the space bar switches the language; the space goes in only for a tap.
+            // A slide is several small steps of the finger along the bar; a thumb flattening on a quick tap
             // makes one jump (78 pt at once) — a quick swipe must still work, so time is not the test
-            if abs(p.x - tr.start.x) > 50, tr.moves >= 3, abs(p.y - tr.start.y) < tr.cap.frame.height, lastOtherDown <= tr.downAt {
-                KLog.write("space swipe \(Int(p.x - tr.start.x))pt → language")
-                if !undoCorrection() { proxy?.deleteBackward() }
+            let dx = p.x - tr.start.x
+            if abs(dx) > 50, tr.moves >= 3, abs(p.y - tr.start.y) < tr.cap.frame.height {
+                KLog.write("space swipe \(Int(dx))pt → language")
                 lastWasSpace = false
                 lang = lang.next
+            } else if abs(dx) > 25, tr.moves >= 3 {
+                KLog.write("space slide \(Int(dx))pt, too short — nothing typed")
+            } else {
+                space()
             }
         case .symbols: symbolsMode = true; rebuild()
         case .letters: symbolsMode = false; rebuild()
@@ -542,9 +552,7 @@ final class KeyboardView: UIView {
     private static let cursorStep: CGFloat = 9
 
     private func startCursorMode(_ tr: Track) {
-        // the space typed on touch-down is taken back (and an autocorrection it made)
-        if !undoCorrection() { proxy?.deleteBackward() }
-        lastWasSpace = false
+        tr.spacePending = false          // nothing was typed: the space waits for the lift
         tr.cursorMode = true
         tr.cursorX = tr.last.x
         preview.isHidden = true
