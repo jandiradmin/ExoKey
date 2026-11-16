@@ -217,7 +217,7 @@ $("#f").addEventListener("submit", async ev => {
     status("checking");
     const pow = await solvePow();
     status("sending");
-    const r = await fetch("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+    const r = await fetch("/api/feedback/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
       product: f.product.value, kind: f.kind.value, text, name: f.name.value, contact: f.contact.value,
       website: f.website.value, lang, version: params.get("version") || "", pow }) });
     powPromise = null;  // each challenge works once

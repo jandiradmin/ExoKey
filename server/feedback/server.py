@@ -139,7 +139,7 @@ class H(BaseHTTPRequestHandler):
 
     def do_POST(self):
         u = urlparse(self.path)
-        if u.path == "/api/feedback":
+        if u.path == "/api/feedback/submit":
             return self.submit()
         if u.path == "/api/feedback/admin/act":
             if not self.is_admin():
