@@ -52,7 +52,6 @@ targets:
     sources:
       - Keyboard
       - path: ../Sources/ExoKey/WordDictionary.swift
-      - path: ../Sources/ExoKey/Calculator.swift
       - path: ../data/dict/ru.exd
         buildPhase: resources
       - path: ../data/dict/en.exd
