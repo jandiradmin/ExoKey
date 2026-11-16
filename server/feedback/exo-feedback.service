@@ -1,0 +1,18 @@
+[Unit]
+Description=Exo feedback form (exokey.top/feedback)
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/exo-feedback/server.py
+EnvironmentFile=/etc/exo-feedback.env
+Environment=FEEDBACK_DB=/var/lib/exo-feedback/feedback.db
+DynamicUser=yes
+StateDirectory=exo-feedback
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

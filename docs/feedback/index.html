@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-LW9CL37B92"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-LW9CL37B92');</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Відгуки та помилки — ExoKey, ExoCalc, ExoCommander, ExoTools</title>
+<meta name="description" content="Повідомте про помилку або запропонуйте ідею для ExoKey, ExoCalc, ExoCommander та ExoTools. Report a bug or suggest an idea.">
+<link rel="canonical" href="https://exokey.top/feedback/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='4' width='28' height='24' rx='6' fill='%23ffb547'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root {
+  --bg: #0e1013; --bg-2: #14171c; --card: #191d23; --line: #2a2f38;
+  --fg: #eef0f3; --muted: #98a0ae; --accent: #ffb547; --accent-ink: #1a1306;
+  --ok: #3fb950; --err: #ff7b72;
+  --font-display: "Unbounded", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--fg); margin: 0; }
+body { font: 400 17px/1.6 var(--font-body); -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+.wrap { max-width: 760px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-left, 0px)); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+.nav .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 64px; }
+.logo { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 700 20px/1 var(--font-display); }
+.logo svg { width: 30px; height: 30px; }
+.langs { display: inline-flex; background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+.langs button { border: 0; background: transparent; color: var(--muted); font: 600 12px/1 var(--font-body); letter-spacing: .06em; padding: 8px 11px; border-radius: 999px; cursor: pointer; }
+.langs button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+h1 { font: 700 clamp(26px, 5vw, 38px)/1.15 var(--font-display); margin: 32px 0 10px; text-wrap: balance; }
+h2 { font: 700 22px/1.3 var(--font-display); margin: 48px 0 6px; }
+.lead, .muted { color: var(--muted); }
+form { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px; margin-top: 24px; display: grid; gap: 16px; }
+label { display: grid; gap: 6px; font-weight: 500; font-size: 15px; }
+label small { color: var(--muted); font-weight: 400; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 560px) { .row { grid-template-columns: 1fr; } }
+input, select, textarea { font: inherit; color: var(--fg); background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%; }
+textarea { min-height: 150px; resize: vertical; }
+.kinds { display: flex; flex-wrap: wrap; gap: 8px; border: 0; padding: 0; margin: 0; }
+.kinds legend { font-weight: 500; font-size: 15px; margin-bottom: 6px; padding: 0; }
+.kinds label { display: inline-flex; align-items: center; gap: 6px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; cursor: pointer; font-weight: 400; }
+.kinds input { width: auto; accent-color: var(--accent); }
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 12px; padding: 12px 22px; font: 600 16px/1 var(--font-body); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+.btn[disabled] { opacity: .6; cursor: progress; }
+#status { font-size: 15px; }
+#status.ok { color: var(--ok); } #status.err { color: var(--err); }
+.filter { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.filter button { border: 1px solid var(--line); background: var(--card); color: var(--muted); border-radius: 999px; padding: 6px 14px; font: 500 14px/1.2 var(--font-body); cursor: pointer; }
+.filter button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.item { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin: 10px 0; }
+.item .meta { color: var(--muted); font-size: 13.5px; display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.item .tag { color: var(--accent); }
+.item .text { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 6px; }
+.item .reply { margin-top: 10px; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--bg-2); border-radius: 0 10px 10px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.item .reply b { display: block; font-size: 13px; color: var(--accent); }
+footer { color: var(--muted); font-size: 14px; padding: 48px 0 32px; }
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="wrap">
+    <a class="logo" href="/" aria-label="ExoKey">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="4" width="28" height="24" rx="6" fill="#ffb547"/><text x="16" y="20.5" font-family="Unbounded, Arial, sans-serif" font-weight="700" font-size="11" text-anchor="middle" fill="#1a1306">Ex</text></svg>
+      Exo
+    </a>
+    <div class="langs" role="group" aria-label="Language">
+      <button data-lang="uk" aria-pressed="true">UA</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+      <button data-lang="ru" aria-pressed="false">RU</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1 data-i="h1">Помилка чи ідея?</h1>
+  <p class="lead" data-i="lead">Напишіть нам — ми читаємо кожне повідомлення. Після перевірки відгук з'явиться нижче на цій сторінці.</p>
+
+  <form id="f" novalidate>
+    <div class="row">
+      <label><span data-i="f_product">Програма</span>
+        <select name="product" id="product">
+          <option value="exokey">ExoKey</option>
+          <option value="exocalc">ExoCalc</option>
+          <option value="exocommander">ExoCommander</option>
+          <option value="exotools">ExoTools</option>
+          <option value="other" data-i="p_other">Інше</option>
+        </select>
+      </label>
+      <fieldset class="kinds">
+        <legend data-i="f_kind">Що це</legend>
+        <label><input type="radio" name="kind" value="bug" checked><span data-i="k_bug">Помилка</span></label>
+        <label><input type="radio" name="kind" value="idea"><span data-i="k_idea">Ідея</span></label>
+        <label><input type="radio" name="kind" value="other"><span data-i="k_other">Інше</span></label>
+      </fieldset>
+    </div>
+    <label><span data-i="f_text">Опишіть, що сталося або що хочете</span>
+      <textarea name="text" id="text" maxlength="4000" required data-i-ph="ph_text" placeholder="Що робили, що очікували, що отримали. Версія програми та macOS/Windows теж допоможуть."></textarea>
+    </label>
+    <div class="row">
+      <label><span><span data-i="f_name">Ім'я</span> <small data-i="f_name_note">(необов'язково, буде видно)</small></span>
+        <input name="name" maxlength="60" autocomplete="nickname">
+      </label>
+      <label><span><span data-i="f_contact">E-mail або Telegram</span> <small data-i="f_contact_note">(необов'язково, не публікується)</small></span>
+        <input name="contact" maxlength="120" autocomplete="email">
+      </label>
+    </div>
+    <div class="hp" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off"></label></div>
+    <div class="actions">
+      <button class="btn" id="send" type="submit" data-i="send">Надіслати</button>
+      <span id="status" role="status" aria-live="polite"></span>
+    </div>
+  </form>
+
+  <h2 data-i="list_h">Відгуки</h2>
+  <div class="filter" id="filter">
+    <button data-p="" aria-pressed="true" data-i="all">Усі</button>
+    <button data-p="exokey" aria-pressed="false">ExoKey</button>
+    <button data-p="exocalc" aria-pressed="false">ExoCalc</button>
+    <button data-p="exocommander" aria-pressed="false">ExoCommander</button>
+    <button data-p="exotools" aria-pressed="false">ExoTools</button>
+  </div>
+  <div id="list"><p class="muted" data-i="loading">Завантаження…</p></div>
+</main>
+
+<footer class="wrap"><a href="/">exokey.top</a> · <a href="https://exocommander.top">ExoCommander</a> · <a href="https://git.exokey.top/yan/ExoCalc">ExoCalc</a></footer>
+
+<script>
+const T = {
+  uk: {
+    h1: "Помилка чи ідея?", lead: "Напишіть нам — ми читаємо кожне повідомлення. Після перевірки відгук з'явиться нижче на цій сторінці.",
+    f_product: "Програма", p_other: "Інше", f_kind: "Що це", k_bug: "Помилка", k_idea: "Ідея", k_other: "Інше",
+    f_text: "Опишіть, що сталося або що хочете", ph_text: "Що робили, що очікували, що отримали. Версія програми та macOS/Windows теж допоможуть.",
+    f_name: "Ім'я", f_name_note: "(необов'язково, буде видно)", f_contact: "E-mail або Telegram", f_contact_note: "(необов'язково, не публікується)",
+    send: "Надіслати", list_h: "Відгуки", all: "Усі", loading: "Завантаження…", empty: "Поки що немає опублікованих відгуків.",
+    checking: "Перевірка, що ви не робот…", sending: "Надсилаємо…", sent: "Дякуємо! Повідомлення отримано. Воно з'явиться тут після перевірки.",
+    e_short: "Напишіть хоча б кілька слів.", e_rate: "Забагато повідомлень. Спробуйте за кілька хвилин.", e_fail: "Не вдалося надіслати. Спробуйте ще раз.",
+    anon: "Анонім", bug: "помилка", idea: "ідея", other: "інше", reply: "Відповідь", title: "Відгуки та помилки — ExoKey, ExoCalc, ExoCommander, ExoTools"
+  },
+  en: {
+    h1: "Found a bug or have an idea?", lead: "Write to us — we read every message. After review, your feedback will appear below on this page.",
+    f_product: "App", p_other: "Other", f_kind: "Type", k_bug: "Bug", k_idea: "Idea", k_other: "Other",
+    f_text: "Tell us what happened or what you'd like", ph_text: "What you did, what you expected, what you got. The app version and macOS/Windows help too.",
+    f_name: "Name", f_name_note: "(optional, shown publicly)", f_contact: "E-mail or Telegram", f_contact_note: "(optional, never published)",
+    send: "Send", list_h: "Feedback", all: "All", loading: "Loading…", empty: "No published feedback yet.",
+    checking: "Checking you're not a robot…", sending: "Sending…", sent: "Thank you! Message received. It will appear here after review.",
+    e_short: "Please write at least a few words.", e_rate: "Too many messages. Try again in a few minutes.", e_fail: "Couldn't send. Please try again.",
+    anon: "Anonymous", bug: "bug", idea: "idea", other: "other", reply: "Reply", title: "Feedback and bug reports — ExoKey, ExoCalc, ExoCommander, ExoTools"
+  },
+  ru: {
+    h1: "Ошибка или идея?", lead: "Напишите нам — мы читаем каждое сообщение. После проверки отзыв появится ниже на этой странице.",
+    f_product: "Программа", p_other: "Другое", f_kind: "Что это", k_bug: "Ошибка", k_idea: "Идея", k_other: "Другое",
+    f_text: "Опишите, что случилось или что хотите", ph_text: "Что делали, что ожидали, что получили. Версия программы и macOS/Windows тоже помогут.",
+    f_name: "Имя", f_name_note: "(необязательно, будет видно)", f_contact: "E-mail или Telegram", f_contact_note: "(необязательно, не публикуется)",
+    send: "Отправить", list_h: "Отзывы", all: "Все", loading: "Загрузка…", empty: "Пока нет опубликованных отзывов.",
+    checking: "Проверка, что вы не робот…", sending: "Отправляем…", sent: "Спасибо! Сообщение получено. Оно появится здесь после проверки.",
+    e_short: "Напишите хотя бы несколько слов.", e_rate: "Слишком много сообщений. Попробуйте через несколько минут.", e_fail: "Не удалось отправить. Попробуйте ещё раз.",
+    anon: "Аноним", bug: "ошибка", idea: "идея", other: "другое", reply: "Ответ", title: "Отзывы и ошибки — ExoKey, ExoCalc, ExoCommander, ExoTools"
+  }
+};
+const NAMES = { exokey: "ExoKey", exocalc: "ExoCalc", exocommander: "ExoCommander", exotools: "ExoTools", other: "" };
+let lang = "uk", items = [], filterP = "";
+const $ = s => document.querySelector(s);
+
+function pickLang() {
+  try { const s = localStorage.getItem("exokey-lang"); if (T[s]) return s; } catch (e) {}
+  const n = (navigator.language || "en").slice(0, 2);
+  return n === "uk" ? "uk" : n === "ru" ? "ru" : "en";
+}
+function setLang(l) {
+  lang = l; document.documentElement.lang = l; document.title = T[l].title;
+  document.querySelectorAll("[data-i]").forEach(el => { const v = T[l][el.dataset.i]; if (v) el.textContent = v; });
+  document.querySelectorAll("[data-i-ph]").forEach(el => { el.placeholder = T[l][el.dataset.iPh]; });
+  document.querySelectorAll(".langs button").forEach(b => b.setAttribute("aria-pressed", b.dataset.lang === l));
+  try { localStorage.setItem("exokey-lang", l); } catch (e) {}
+  render();
+}
+document.querySelectorAll(".langs button").forEach(b => b.onclick = () => setLang(b.dataset.lang));
+
+// ---- proof-of-work captcha: find n with sha256(salt + n) == challenge ----
+let powPromise = null;
+async function sha256hex(s) {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(d), b => b.toString(16).padStart(2, "0")).join("");
+}
+function solvePow() {
+  if (!powPromise) powPromise = (async () => {
+    const c = await (await fetch("/api/feedback/challenge", { cache: "no-store" })).json();
+    for (let n = 0; n <= c.maxnumber; n++) {
+      if (await sha256hex(c.salt + n) === c.challenge) return { salt: c.salt, number: n, challenge: c.challenge, signature: c.signature };
+    }
+    throw new Error("pow");
+  })();
+  return powPromise;
+}
+$("#f").addEventListener("focusin", () => { solvePow().catch(() => { powPromise = null; }); }, { once: true });
+
+const params = new URLSearchParams(location.search);
+if (NAMES[params.get("product")] !== undefined) $("#product").value = params.get("product");
+
+function status(key, cls) { const s = $("#status"); s.textContent = key ? T[lang][key] : ""; s.className = cls || ""; s.dataset.key = key || ""; }
+
+$("#f").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const f = ev.target, text = f.text.value.trim();
+  if (text.length < 5) { status("e_short", "err"); f.text.focus(); return; }
+  const btn = $("#send"); btn.disabled = true;
+  try {
+    status("checking");
+    const pow = await solvePow();
+    status("sending");
+    const r = await fetch("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+      product: f.product.value, kind: f.kind.value, text, name: f.name.value, contact: f.contact.value,
+      website: f.website.value, lang, version: params.get("version") || "", pow }) });
+    powPromise = null;  // each challenge works once
+    if (r.ok) {
+      status("sent", "ok"); f.text.value = "";
+      if (typeof gtag === "function") gtag("event", "feedback_sent", { product: f.product.value });
+    } else status(r.status === 429 ? "e_rate" : "e_fail", "err");
+  } catch (e) { powPromise = null; status("e_fail", "err"); }
+  btn.disabled = false;
+});
+
+// ---- published feedback ----
+function render() {
+  const s = $("#status"); if (s.dataset.key) s.textContent = T[lang][s.dataset.key];
+  const list = $("#list"), L = T[lang];
+  const shown = items.filter(i => !filterP || i.product === filterP);
+  list.replaceChildren();
+  if (!shown.length) { const p = document.createElement("p"); p.className = "muted"; p.textContent = items.loaded ? L.empty : L.loading; list.append(p); return; }
+  const fmt = new Intl.DateTimeFormat(lang === "uk" ? "uk-UA" : lang === "ru" ? "ru-UA" : "en-GB", { dateStyle: "medium" });
+  for (const i of shown) {
+    const d = document.createElement("div"); d.className = "item";
+    const m = document.createElement("div"); m.className = "meta";
+    const tag = document.createElement("span"); tag.className = "tag"; tag.textContent = [NAMES[i.product], L[i.kind]].filter(Boolean).join(" · ");
+    const who = document.createElement("span"); who.textContent = i.name || L.anon;
+    const when = document.createElement("span"); when.textContent = fmt.format(new Date(i.created * 1000));
+    m.append(tag, who, when);
+    const t = document.createElement("div"); t.className = "text"; t.textContent = i.text;
+    d.append(m, t);
+    if (i.reply) { const r = document.createElement("div"); r.className = "reply"; const b = document.createElement("b"); b.textContent = L.reply; r.append(b, i.reply); d.append(r); }
+    list.append(d);
+  }
+}
+document.querySelectorAll("#filter button").forEach(b => b.onclick = () => {
+  filterP = b.dataset.p;
+  document.querySelectorAll("#filter button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  render();
+});
+fetch("/api/feedback/list", { cache: "no-store" }).then(r => r.json()).then(a => { items = a; items.loaded = true; render(); })
+  .catch(() => { items = []; items.loaded = true; render(); });
+
+setLang(pickLang());
+</script>
+</body>
+</html>
