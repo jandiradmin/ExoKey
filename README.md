@@ -4,7 +4,7 @@
 
 ExoKey fixes text typed in the wrong keyboard layout on macOS (English, Russian, Ukrainian) and suggests the next words with a local AI model. Everything runs on your Mac; no text leaves your computer.
 
-**[⬇ Download the latest release](https://github.com/jandiradmin/ExoKey/releases/latest)** · **[🌐 exokey.top](https://exokey.top)** · macOS 13+ · Apple Silicon
+**[⬇ Download the latest release](https://git.exokey.top/yan/ExoKey/releases/latest)** · **[🌐 exokey.top](https://exokey.top)** · macOS 13+ · Apple Silicon
 
 ![ExoKey demo: layout fix, learning, AI autocomplete, phrases, per-app layouts, calculator](docs/media/demo-en.gif)
 
@@ -51,7 +51,7 @@ All hotkeys can be changed in Settings.
 
 ## Install
 
-1. Download `ExoKey-x.y.z.zip` from [Releases](https://github.com/jandiradmin/ExoKey/releases), unzip it and move `ExoKey.app` to **Applications**.
+1. Download `ExoKey-x.y.z.zip` from [Releases](https://git.exokey.top/yan/ExoKey/releases), unzip it and move `ExoKey.app` to **Applications**.
 2. Preview builds are not notarized yet. If macOS says **“ExoKey.app” Not Opened**, click **Done** (not “Move to Trash”), then go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway**. Or run `xattr -dr com.apple.quarantine /Applications/ExoKey.app` in Terminal.
 
    ![How to allow ExoKey to open](docs/media/install-en.png)
@@ -73,7 +73,7 @@ ExoKey is free and open source. If it saves you time, you can support developmen
 
 ```
 xcode-select --install
-git clone git@github.com:jandiradmin/ExoKey.git && cd ExoKey
+git clone https://git.exokey.top/yan/ExoKey.git && cd ExoKey
 scripts/fetch_dicts.sh          # downloads word lists, builds data/dict/*.exd
 scripts/make_dev_cert.sh        # stable local signing, so permissions survive rebuilds
 scripts/build_app.sh --install  # builds ExoKey.app and installs it to /Applications
@@ -96,7 +96,7 @@ If ExoKey is useful to you, a donation or a ⭐ is appreciated.
 
 ExoKey виправляє текст, набраний не в тій розкладці на macOS (англійська, російська, українська), і підказує наступні слова за допомогою локальної моделі ШІ. Усе працює на вашому Mac, текст нікуди не надсилається.
 
-**[⬇ Завантажити останню версію](https://github.com/jandiradmin/ExoKey/releases/latest)** · **[🌐 exokey.top](https://exokey.top)** · macOS 13+ · Apple Silicon
+**[⬇ Завантажити останню версію](https://git.exokey.top/yan/ExoKey/releases/latest)** · **[🌐 exokey.top](https://exokey.top)** · macOS 13+ · Apple Silicon
 
 ![Демо ExoKey: розкладка, навчання, автодоповнення ШІ, фрази, розкладка для програм, калькулятор](docs/media/demo-uk.gif)
 
@@ -143,7 +143,7 @@ ExoKey виправляє текст, набраний не в тій розкл
 
 ### Встановлення
 
-1. Завантажте `ExoKey-x.y.z.zip` з [Releases](https://github.com/jandiradmin/ExoKey/releases), розпакуйте й перенесіть `ExoKey.app` до **Програм**.
+1. Завантажте `ExoKey-x.y.z.zip` з [Releases](https://git.exokey.top/yan/ExoKey/releases), розпакуйте й перенесіть `ExoKey.app` до **Програм**.
 2. Попередні версії ще не нотаризовані. Якщо macOS пише **«ExoKey.app» Not Opened**, натисніть **Done** (не «Move to Trash»), потім відкрийте **Системні параметри → Приватність і безпека**, прокрутіть униз і натисніть **Усе одно відкрити** (Open Anyway). Або виконайте в Терміналі `xattr -dr com.apple.quarantine /Applications/ExoKey.app`.
 
    ![Як дозволити запуск ExoKey](docs/media/install-uk.png)
@@ -174,7 +174,7 @@ ExoKey безкоштовний і з відкритим кодом. Якщо в
 
 ExoKey исправляет текст, набранный не в той раскладке на macOS (английская, русская, украинская), и подсказывает следующие слова с помощью локальной модели ИИ. Всё работает на вашем Mac, текст никуда не отправляется.
 
-**[⬇ Скачать последнюю версию](https://github.com/jandiradmin/ExoKey/releases/latest)** · **[🌐 exokey.top](https://exokey.top)** · macOS 13+ · Apple Silicon
+**[⬇ Скачать последнюю версию](https://git.exokey.top/yan/ExoKey/releases/latest)** · **[🌐 exokey.top](https://exokey.top)** · macOS 13+ · Apple Silicon
 
 ![Демо ExoKey: раскладка, обучение, автодополнение ИИ, фразы, раскладка для программ, калькулятор](docs/media/demo-en.gif)
 
@@ -221,7 +221,7 @@ ExoKey исправляет текст, набранный не в той рас
 
 ### Установка
 
-1. Скачайте `ExoKey-x.y.z.zip` из [Releases](https://github.com/jandiradmin/ExoKey/releases), распакуйте и перенесите `ExoKey.app` в **Программы**.
+1. Скачайте `ExoKey-x.y.z.zip` из [Releases](https://git.exokey.top/yan/ExoKey/releases), распакуйте и перенесите `ExoKey.app` в **Программы**.
 2. Предварительные версии ещё не нотаризованы. Если macOS пишет **«ExoKey.app» Not Opened**, нажмите **Done** (не «Move to Trash»), затем откройте **Системные настройки → Конфиденциальность и безопасность**, прокрутите вниз и нажмите **Всё равно открыть** (Open Anyway). Или выполните в Терминале `xattr -dr com.apple.quarantine /Applications/ExoKey.app`.
 
    ![Как разрешить запуск ExoKey](docs/media/install-ru.png)
