@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-LW9CL37B92"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-LW9CL37B92');</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ExoTools — мережеві утиліти для macOS і Windows</title>
+<meta name="description" content="ExoTools (Exo Network Tools) — безкоштовна програма з відкритим кодом: ping, traceroute, MTR, Geo MTR з картою, DNS, NSLookup, whois, сканер портів, тест швидкості. macOS і Windows. Network tools for macOS and Windows.">
+<link rel="canonical" href="https://exokey.top/exotools/">
+<meta property="og:title" content="ExoTools — Exo Network Tools">
+<meta property="og:description" content="Ping, traceroute, MTR, Geo MTR, DNS, whois, port scan and speed test in one window. macOS & Windows, open source.">
+<meta property="og:image" content="https://exokey.top/media/exotools/mtr.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='4' width='28' height='24' rx='6' fill='%23ffb547'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #0e1013; --bg-2: #14171c; --card: #191d23; --line: #2a2f38;
+  --fg: #eef0f3; --muted: #98a0ae; --accent: #ffb547; --accent-ink: #1a1306;
+  --font-display: "Unbounded", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--fg); margin: 0; }
+body { font: 400 17px/1.6 var(--font-body); -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+img { max-width: 100%; display: block; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-left, 0px)); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+.nav .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 64px; }
+.logo { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 700 20px/1 var(--font-display); }
+.logo svg { width: 30px; height: 30px; }
+.langs { display: inline-flex; background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+.langs button { border: 0; background: transparent; color: var(--muted); font: 600 12px/1 var(--font-body); letter-spacing: .06em; padding: 8px 11px; border-radius: 999px; cursor: pointer; }
+.langs button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.eyebrow { color: var(--accent); font: 500 13px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; margin-top: 40px; }
+h1 { font: 700 clamp(28px, 5.5vw, 48px)/1.12 var(--font-display); margin: 14px 0 14px; text-wrap: balance; }
+h2 { font: 700 clamp(22px, 3.4vw, 28px)/1.25 var(--font-display); margin: 72px 0 8px; text-wrap: balance; }
+h3 { font: 600 18px/1.3 var(--font-body); margin: 0 0 4px; }
+.lead { color: var(--muted); font-size: 19px; max-width: 720px; }
+.muted { color: var(--muted); }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; margin: 26px 0 8px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; border-radius: 12px; padding: 13px 22px; font: 600 16px/1 var(--font-body); text-decoration: none; border: 1px solid var(--line); background: var(--card); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.note { font-size: 14px; color: var(--muted); }
+.hero-shot { margin-top: 36px; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(0,0,0,.45); background: #f4f6f9; }
+.features { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; margin-top: 22px; }
+.feat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+.feat p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr)); gap: 22px; margin-top: 22px; }
+figure { margin: 0; }
+figure a { display: block; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: #f4f6f9; }
+figure a:hover { border-color: var(--accent); }
+figcaption { margin-top: 10px; font-size: 15px; color: var(--muted); }
+figcaption b { color: var(--fg); font-weight: 600; }
+.steps { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 6px 22px; margin-top: 18px; }
+.steps li { margin: 12px 0; }
+code { font: 400 14px/1.5 var(--font-mono); background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; }
+footer { color: var(--muted); font-size: 14px; padding: 64px 0 32px; }
+dialog { padding: 0; border: 0; background: transparent; max-width: 96vw; max-height: 96vh; }
+dialog::backdrop { background: rgba(0,0,0,.82); }
+dialog img { max-width: 96vw; max-height: 92vh; border-radius: 10px; }
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="wrap">
+    <a class="logo" href="/" aria-label="Exo">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="4" width="28" height="24" rx="6" fill="#ffb547"/><text x="16" y="20.5" font-family="Unbounded, Arial, sans-serif" font-weight="700" font-size="11" text-anchor="middle" fill="#1a1306">Ex</text></svg>
+      Exo
+    </a>
+    <div class="langs" role="group" aria-label="Language">
+      <button data-lang="uk" aria-pressed="true">UA</button>
+      <button data-lang="en" aria-pressed="false">EN</button>
+      <button data-lang="ru" aria-pressed="false">RU</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="eyebrow">ExoTools · Exo Network Tools</div>
+  <h1 data-i="h1">Усі мережеві утиліти в одному вікні</h1>
+  <p class="lead" data-i="lead">Ping, traceroute, MTR, Geo MTR з картою маршруту, DNS, NSLookup, whois, сканер портів і тест швидкості. Без командного рядка, без прав адміністратора на macOS. Безкоштовно і з відкритим кодом.</p>
+  <div class="cta">
+    <a class="btn primary" href="https://git.exokey.top/yan/ExoTools/releases" data-dl="mac" data-i="dl_mac">Завантажити для macOS</a>
+    <a class="btn primary" href="https://git.exokey.top/yan/ExoTools/releases" data-dl="win" data-i="dl_win">Завантажити для Windows</a>
+    <a class="btn" href="https://git.exokey.top/yan/ExoTools" data-i="src">Код</a>
+  </div>
+  <p class="note" data-i="req">macOS 11+ (Apple Silicon) · Windows 10/11 (x64) · v0.1.0</p>
+  <div class="hero-shot"><img src="/media/exotools/mtr.png" width="1240" height="820" alt="ExoTools MTR" loading="eager"></div>
+
+  <h2 data-i="f_h2">Що вміє</h2>
+  <div class="features">
+    <div class="feat"><h3>My IP</h3><p data-i="f_myip">Публічна IPv4/IPv6, місто, провайдер і ASN, карта. Пошук будь-якої IP-адреси.</p></div>
+    <div class="feat"><h3>IP Config</h3><p data-i="f_ipconfig">Інтерфейси, маски, MAC, MTU, шлюз і DNS-сервери — як <code>ipconfig /all</code>.</p></div>
+    <div class="feat"><h3>Ping</h3><p data-i="f_ping">ICMP або TCP, живий графік затримки, втрати, джитер.</p></div>
+    <div class="feat"><h3>Traceroute</h3><p data-i="f_trace">Маршрут до хоста через ICMP, UDP або TCP.</p></div>
+    <div class="feat"><h3>MTR</h3><p data-i="f_mtr">Безперервний traceroute зі статистикою втрат і затримки на кожному вузлі.</p></div>
+    <div class="feat"><h3>Geo MTR</h3><p data-i="f_geo">MTR + країна, місто й ASN кожного вузла та маршрут на карті.</p></div>
+    <div class="feat"><h3>NSLookup</h3><p data-i="f_ns">Ім'я → усі IPv4/IPv6 і ланцюжок CNAME, або IP → ім'я.</p></div>
+    <div class="feat"><h3>DNS (dig)</h3><p data-i="f_dns">Будь-який тип запису, системний, Cloudflare, Google, Quad9 або свій резолвер.</p></div>
+    <div class="feat"><h3>Whois</h3><p data-i="f_whois">Домени, IP, ASN — сам іде за посиланнями IANA → реєстр → реєстратор.</p></div>
+    <div class="feat"><h3>Port scan</h3><p data-i="f_port">TCP-сканер у стилі nmap: top-100, 1–1024, усі порти або свій список, банери сервісів.</p></div>
+    <div class="feat"><h3>Speed test</h3><p data-i="f_speed">Затримка, джитер, завантаження і віддача.</p></div>
+    <div class="feat"><h3 data-i="f_hist_h">Історія</h3><p data-i="f_hist">Останні запити кожного інструмента, «Копіювати звіт», Esc — стоп.</p></div>
+  </div>
+
+  <h2 data-i="s_h2">Скріншоти</h2>
+  <div class="gallery" id="gallery"></div>
+
+  <h2 data-i="i_h2">Встановлення</h2>
+  <ol class="steps">
+    <li data-i="i_mac">macOS: відкрийте <b>.dmg</b> і перетягніть ExoTools у «Програми». Під час першого запуску: правий клік на програмі → «Відкрити».</li>
+    <li data-i="i_win">Windows: запустіть <b>ExoTools_x64-setup.exe</b>. Якщо SmartScreen попередить — «Докладніше» → «Усе одно запустити». ICMP ping і traceroute потребують запуску від імені адміністратора, TCP ping працює і так.</li>
+    <li data-i="i_fb">Знайшли помилку чи маєте ідею? <a href="/feedback/?product=exotools">Напишіть нам</a>.</li>
+  </ol>
+</main>
+
+<footer class="wrap"><a href="/">ExoKey</a> · <a href="https://git.exokey.top/yan/ExoCalc">ExoCalc</a> · <a href="https://exocommander.top">ExoCommander</a> · <a href="https://git.exokey.top/yan/ExoTools">ExoTools</a> · <a href="/feedback/?product=exotools" data-i="fb">Відгуки</a></footer>
+
+<dialog id="zoom"><img alt=""></dialog>
+
+<script>
+const SHOTS = ["mtr", "geomtr", "ping", "trace", "dns", "whois", "portscan"];
+const T = {
+  uk: {
+    title: "ExoTools — мережеві утиліти для macOS і Windows",
+    h1: "Усі мережеві утиліти в одному вікні",
+    lead: "Ping, traceroute, MTR, Geo MTR з картою маршруту, DNS, NSLookup, whois, сканер портів і тест швидкості. Без командного рядка, без прав адміністратора на macOS. Безкоштовно і з відкритим кодом.",
+    dl_mac: "Завантажити для macOS", dl_win: "Завантажити для Windows", src: "Код",
+    req: "macOS 11+ (Apple Silicon) · Windows 10/11 (x64) · v0.1.0",
+    f_h2: "Що вміє",
+    f_myip: "Публічна IPv4/IPv6, місто, провайдер і ASN, карта. Пошук будь-якої IP-адреси.",
+    f_ipconfig: "Інтерфейси, маски, MAC, MTU, шлюз і DNS-сервери — як ipconfig /all.",
+    f_ping: "ICMP або TCP, живий графік затримки, втрати, джитер.",
+    f_trace: "Маршрут до хоста через ICMP, UDP або TCP.",
+    f_mtr: "Безперервний traceroute зі статистикою втрат і затримки на кожному вузлі.",
+    f_geo: "MTR + країна, місто й ASN кожного вузла та маршрут на карті.",
+    f_ns: "Ім'я → усі IPv4/IPv6 і ланцюжок CNAME, або IP → ім'я.",
+    f_dns: "Будь-який тип запису, системний, Cloudflare, Google, Quad9 або свій резолвер.",
+    f_whois: "Домени, IP, ASN — сам іде за посиланнями IANA → реєстр → реєстратор.",
+    f_port: "TCP-сканер у стилі nmap: top-100, 1–1024, усі порти або свій список, банери сервісів.",
+    f_speed: "Затримка, джитер, завантаження і віддача.",
+    f_hist_h: "Історія", f_hist: "Останні запити кожного інструмента, «Копіювати звіт», Esc — стоп.",
+    s_h2: "Скріншоти",
+    cap: { mtr: ["MTR", "статистика по кожному вузлу в реальному часі"], geomtr: ["Geo MTR", "маршрут на карті з містами та ASN"], ping: ["Ping", "графік затримки та втрати"], trace: ["Traceroute", "ICMP / UDP / TCP"], dns: ["DNS (dig)", "записи та вибір резолвера"], whois: ["Whois", "домени, IP, ASN"], portscan: ["Port scan", "відкриті порти й сервіси"], speed: ["Speed test", "завантаження, віддача, ping"] },
+    i_h2: "Встановлення",
+    i_mac: "macOS: відкрийте .dmg і перетягніть ExoTools у «Програми». Під час першого запуску: правий клік на програмі → «Відкрити».",
+    i_win: "Windows: запустіть ExoTools_x64-setup.exe. Якщо SmartScreen попередить — «Докладніше» → «Усе одно запустити». ICMP ping і traceroute потребують запуску від імені адміністратора, TCP ping працює і так.",
+    i_fb: "Знайшли помилку чи маєте ідею? Напишіть нам.", fb: "Відгуки"
+  },
+  en: {
+    title: "ExoTools — network tools for macOS and Windows",
+    h1: "All your network tools in one window",
+    lead: "Ping, traceroute, MTR, Geo MTR with a route map, DNS, NSLookup, whois, port scanner and speed test. No command line, no admin rights on macOS. Free and open source.",
+    dl_mac: "Download for macOS", dl_win: "Download for Windows", src: "Source code",
+    req: "macOS 11+ (Apple Silicon) · Windows 10/11 (x64) · v0.1.0",
+    f_h2: "What it does",
+    f_myip: "Public IPv4/IPv6, city, ISP and ASN, map. Look up any IP address.",
+    f_ipconfig: "Interfaces, masks, MAC, MTU, gateway and DNS servers — like ipconfig /all.",
+    f_ping: "ICMP or TCP, live latency chart, loss, jitter.",
+    f_trace: "Route to a host over ICMP, UDP or TCP.",
+    f_mtr: "Continuous traceroute with loss and latency stats for every hop.",
+    f_geo: "MTR + country, city and ASN of each hop, and the route on a map.",
+    f_ns: "Name → all IPv4/IPv6 and the CNAME chain, or IP → name.",
+    f_dns: "Any record type; system, Cloudflare, Google, Quad9 or your own resolver.",
+    f_whois: "Domains, IPs, ASNs — follows referrals IANA → registry → registrar.",
+    f_port: "nmap-style TCP scanner: top-100, 1–1024, all ports or a custom list, service banners.",
+    f_speed: "Latency, jitter, download and upload.",
+    f_hist_h: "History", f_hist: "Recent queries for every tool, “Copy report”, Esc to stop.",
+    s_h2: "Screenshots",
+    cap: { mtr: ["MTR", "live per-hop statistics"], geomtr: ["Geo MTR", "the route on a map with cities and ASNs"], ping: ["Ping", "latency chart and packet loss"], trace: ["Traceroute", "ICMP / UDP / TCP"], dns: ["DNS (dig)", "records and resolver choice"], whois: ["Whois", "domains, IPs, ASNs"], portscan: ["Port scan", "open ports and services"], speed: ["Speed test", "download, upload, ping"] },
+    i_h2: "Install",
+    i_mac: "macOS: open the .dmg and drag ExoTools to Applications. On first launch: right-click the app → Open.",
+    i_win: "Windows: run ExoTools_x64-setup.exe. If SmartScreen warns you — “More info” → “Run anyway”. ICMP ping and traceroute need “Run as administrator”; TCP ping works without it.",
+    i_fb: "Found a bug or have an idea? Tell us.", fb: "Feedback"
+  },
+  ru: {
+    title: "ExoTools — сетевые утилиты для macOS и Windows",
+    h1: "Все сетевые утилиты в одном окне",
+    lead: "Ping, traceroute, MTR, Geo MTR с картой маршрута, DNS, NSLookup, whois, сканер портов и тест скорости. Без командной строки, без прав администратора на macOS. Бесплатно и с открытым кодом.",
+    dl_mac: "Скачать для macOS", dl_win: "Скачать для Windows", src: "Код",
+    req: "macOS 11+ (Apple Silicon) · Windows 10/11 (x64) · v0.1.0",
+    f_h2: "Что умеет",
+    f_myip: "Публичный IPv4/IPv6, город, провайдер и ASN, карта. Поиск любого IP-адреса.",
+    f_ipconfig: "Интерфейсы, маски, MAC, MTU, шлюз и DNS-серверы — как ipconfig /all.",
+    f_ping: "ICMP или TCP, живой график задержки, потери, джиттер.",
+    f_trace: "Маршрут до хоста через ICMP, UDP или TCP.",
+    f_mtr: "Непрерывный traceroute со статистикой потерь и задержки на каждом узле.",
+    f_geo: "MTR + страна, город и ASN каждого узла и маршрут на карте.",
+    f_ns: "Имя → все IPv4/IPv6 и цепочка CNAME, или IP → имя.",
+    f_dns: "Любой тип записи; системный, Cloudflare, Google, Quad9 или свой резолвер.",
+    f_whois: "Домены, IP, ASN — сам идёт по ссылкам IANA → реестр → регистратор.",
+    f_port: "TCP-сканер в стиле nmap: top-100, 1–1024, все порты или свой список, баннеры сервисов.",
+    f_speed: "Задержка, джиттер, загрузка и отдача.",
+    f_hist_h: "История", f_hist: "Последние запросы каждого инструмента, «Копировать отчёт», Esc — стоп.",
+    s_h2: "Скриншоты",
+    cap: { mtr: ["MTR", "статистика по каждому узлу в реальном времени"], geomtr: ["Geo MTR", "маршрут на карте с городами и ASN"], ping: ["Ping", "график задержки и потери"], trace: ["Traceroute", "ICMP / UDP / TCP"], dns: ["DNS (dig)", "записи и выбор резолвера"], whois: ["Whois", "домены, IP, ASN"], portscan: ["Port scan", "открытые порты и сервисы"], speed: ["Speed test", "загрузка, отдача, ping"] },
+    i_h2: "Установка",
+    i_mac: "macOS: откройте .dmg и перетащите ExoTools в «Программы». При первом запуске: правый клик по программе → «Открыть».",
+    i_win: "Windows: запустите ExoTools_x64-setup.exe. Если SmartScreen предупредит — «Подробнее» → «Выполнить в любом случае». ICMP ping и traceroute требуют запуска от имени администратора, TCP ping работает и так.",
+    i_fb: "Нашли ошибку или есть идея? Напишите нам.", fb: "Отзывы"
+  }
+};
+const $ = s => document.querySelector(s);
+const zoom = $("#zoom");
+zoom.onclick = () => zoom.close();
+
+function renderGallery(L) {
+  $("#gallery").innerHTML = "";
+  for (const k of SHOTS) {
+    const [name, desc] = L.cap[k];
+    const fig = document.createElement("figure");
+    const a = document.createElement("a");
+    a.href = `/media/exotools/${k}.png`;
+    const img = new Image();
+    img.src = a.href; img.alt = `ExoTools ${name}`; img.loading = "lazy"; img.width = 1240; img.height = 820;
+    a.append(img);
+    a.onclick = e => { e.preventDefault(); zoom.querySelector("img").src = a.href; zoom.showModal(); };
+    const cap = document.createElement("figcaption");
+    const b = document.createElement("b"); b.textContent = name;
+    cap.append(b, " — " + desc);
+    fig.append(a, cap);
+    $("#gallery").append(fig);
+  }
+}
+function pickLang() {
+  try { const s = localStorage.getItem("exokey-lang"); if (T[s]) return s; } catch (e) {}
+  const n = (navigator.language || "en").slice(0, 2);
+  return n === "uk" ? "uk" : n === "ru" ? "ru" : "en";
+}
+function setLang(l) {
+  const L = T[l];
+  document.documentElement.lang = l; document.title = L.title;
+  document.querySelectorAll("[data-i]").forEach(el => {
+    const v = L[el.dataset.i]; if (typeof v !== "string") return;
+    if (el.dataset.i === "i_fb") { el.innerHTML = ""; const a = document.createElement("a"); a.href = "/feedback/?product=exotools"; const [q, t] = v.split(/\?\s*/); a.textContent = t; el.append(q + "? ", a); }
+    else el.textContent = v;
+  });
+  document.querySelectorAll(".langs button").forEach(b => b.setAttribute("aria-pressed", b.dataset.lang === l));
+  try { localStorage.setItem("exokey-lang", l); } catch (e) {}
+  renderGallery(L);
+}
+document.querySelectorAll(".langs button").forEach(b => b.onclick = () => setLang(b.dataset.lang));
+document.querySelectorAll("[data-dl]").forEach(a => a.addEventListener("click", () => { try { gtag("event", "download_click", { product: "exotools", os: a.dataset.dl }); } catch (e) {} }));
+setLang(pickLang());
+</script>
+</body>
+</html>
