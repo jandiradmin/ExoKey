@@ -38,4 +38,10 @@
   </url>
   <url><loc>https://exokey.top/feedback/</loc></url>
   <url><loc>https://exokey.top/exotools/</loc></url>
+  <url>
+    <loc>https://exokey.top/generator/</loc>
+    <lastmod>2026-11-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
 </urlset>

@@ -193,6 +193,28 @@ footer a:hover { color: var(--fg); }
 </style>
 </head>
 <body>
+<!-- EXO-BAR: links to every Exo project. Shared by exokey.top pages; keep in sync. -->
+<style>
+  .exo-bar { background: #08090b; border-bottom: 1px solid #1f232a; font: 500 13px/1 "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif; position: relative; z-index: 11; }
+  .exo-bar .exo-bar-in { max-width: 1120px; margin: 0 auto; padding: 0 max(20px, env(safe-area-inset-right, 0px)) 0 max(20px, env(safe-area-inset-left, 0px)); display: flex; align-items: center; gap: 4px; height: 38px; overflow-x: auto; scrollbar-width: none; white-space: nowrap; }
+  .exo-bar .exo-bar-in::-webkit-scrollbar { display: none; }
+  .exo-bar .exo-bar-label { color: #6b7280; letter-spacing: .08em; text-transform: uppercase; font-size: 11px; margin-right: 8px; }
+  .exo-bar a { color: #98a0ae; text-decoration: none; padding: 6px 10px; border-radius: 8px; display: inline-flex; align-items: center; gap: 7px; }
+  .exo-bar a:hover { color: #eef0f3; background: #14171c; }
+  .exo-bar a[aria-current="page"] { color: #eef0f3; background: #191d23; }
+  .exo-bar i { width: 8px; height: 8px; border-radius: 3px; display: inline-block; }
+</style>
+<nav class="exo-bar" aria-label="Exo projects">
+  <div class="exo-bar-in">
+    <span class="exo-bar-label">Exo</span>
+    <a href="https://exokey.top/" data-exo="key" aria-current="page"><i style="background:#ffb547"></i>ExoKey</a>
+    <a href="https://git.exokey.top/yan/ExoCalc" data-exo="calc"><i style="background:#57d18b"></i>ExoCalc</a>
+    <a href="https://exocommander.top" data-exo="commander"><i style="background:#337af2"></i>ExoCommander</a>
+    <a href="https://exokey.top/exotools/" data-exo="tools"><i style="background:#f2626b"></i>ExoTools</a>
+    <a href="https://exokey.top/generator/" data-exo="generator"><i style="background:linear-gradient(135deg,#8b7fff,#2bd3c1)"></i>ExoGenerator</a>
+  </div>
+</nav>
+<!-- /EXO-BAR -->
 
 <header class="nav" id="top">
   <div class="wrap">
@@ -303,7 +325,7 @@ brew install --cask exokey</pre>
     <div class="wrap">
       <div class="section-head">
         <div class="eyebrow" data-i="x_eyebrow">Родина Exo</div>
-        <h2 data-i="x_h2">Ще дві програми для вашого Mac</h2>
+        <h2 data-i="x_h2">Інші програми Exo</h2>
       </div>
       <div class="exo-grid" id="exolist"></div>
     </div>
@@ -326,7 +348,7 @@ brew install --cask exokey</pre>
 <footer>
   <div class="wrap">
     <span>© 2026 ExoKey · MIT</span>
-    <span><a href="https://git.exokey.top/yan/ExoKey" data-i="code">Код</a> · <a href="https://git.exokey.top/yan/ExoKey/releases" data-i="releases">Версії</a> · <a href="https://exokey.top/feedback/?product=exokey" data-i="issues">Повідомити про помилку</a> · <a id="docslink2" href="guide/uk/" data-i="nav_docs">Посібник</a> · <a href="https://git.exokey.top/yan/ExoCalc">ExoCalc</a> · <a href="https://exocommander.top">ExoCommander</a> · <a href="/exotools/">ExoTools</a></span>
+    <span><a href="https://git.exokey.top/yan/ExoKey" data-i="code">Код</a> · <a href="https://git.exokey.top/yan/ExoKey/releases" data-i="releases">Версії</a> · <a href="https://exokey.top/feedback/?product=exokey" data-i="issues">Повідомити про помилку</a> · <a id="docslink2" href="guide/uk/" data-i="nav_docs">Посібник</a> · <a href="https://git.exokey.top/yan/ExoCalc">ExoCalc</a> · <a href="https://exocommander.top">ExoCommander</a> · <a href="/exotools/">ExoTools</a> · <a href="/generator/">ExoGenerator</a></span>
   </div>
 </footer>
 
@@ -484,10 +506,11 @@ const T = {
   },
 };
 
-const EXTRA = {"uk": {"nav_docs": "Посібник", "nav_fb": "Відгуки", "fb_btn": "💬 Написати відгук", "docs": "guide/uk/", "x_eyebrow": "Родина Exo", "x_h2": "Ще дві програми для вашого Mac", "exo": [["ExoCalc", "Калькулятор-блокнот: пишете рядок за рядком, результат одразу праворуч. Валюти й криптовалюти, одиниці, час і дати, звичайні слова. macOS і Windows.", "https://git.exokey.top/yan/ExoCalc", "Завантажити на git.exokey.top →", "calc"], ["ExoCommander", "Нативний двопанельний файловий менеджер для macOS. F-клавіші, SFTP, архіви, фонова черга копіювання, вбудований термінал, групове перейменування.", "https://exocommander.top", "exocommander.top →", "cmd"]]}, "en": {"nav_docs": "Guide", "nav_fb": "Feedback", "fb_btn": "💬 Send feedback", "docs": "guide/", "x_eyebrow": "The Exo family", "x_h2": "Two more apps for your Mac", "exo": [["ExoCalc", "A notepad calculator: type line by line, see results on the right. Currencies and crypto, units, time and dates, plain words. macOS and Windows.", "https://git.exokey.top/yan/ExoCalc", "Download on git.exokey.top →", "calc"], ["ExoCommander", "A native dual-pane file manager for macOS. F-keys, SFTP, archives, background copy queue, built-in terminal, Multi-Rename.", "https://exocommander.top", "exocommander.top →", "cmd"]]}, "ru": {"nav_docs": "Руководство", "nav_fb": "Отзывы", "fb_btn": "💬 Написать отзыв", "docs": "guide/ru/", "x_eyebrow": "Семейство Exo", "x_h2": "Ещё две программы для вашего Mac", "exo": [["ExoCalc", "Калькулятор-блокнот: пишете строку за строкой, результат сразу справа. Валюты и криптовалюты, единицы, время и даты, обычные слова. macOS и Windows.", "https://git.exokey.top/yan/ExoCalc", "Скачать на git.exokey.top →", "calc"], ["ExoCommander", "Нативный двухпанельный файловый менеджер для macOS. F-клавиши, SFTP, архивы, фоновая очередь копирования, встроенный терминал, групповое переименование.", "https://exocommander.top", "exocommander.top →", "cmd"]]}};
+const EXTRA = {"uk": {"nav_docs": "Посібник", "nav_fb": "Відгуки", "fb_btn": "💬 Написати відгук", "docs": "guide/uk/", "x_eyebrow": "Родина Exo", "x_h2": "Інші програми Exo", "exo": [["ExoGenerator", "Ніки для ігор і Wi‑Fi, назви компаній, читабельні паролі й перевірка пароля, NATO і Морзе. Онлайн, Windows і macOS.", "https://exokey.top/generator/", "Відкрити онлайн →", "gen"], ["ExoCalc", "Калькулятор-блокнот: пишете рядок за рядком, результат одразу праворуч. Валюти й криптовалюти, одиниці, час і дати, звичайні слова. macOS і Windows.", "https://git.exokey.top/yan/ExoCalc", "Завантажити на git.exokey.top →", "calc"], ["ExoCommander", "Нативний двопанельний файловий менеджер для macOS. F-клавіші, SFTP, архіви, фонова черга копіювання, вбудований термінал, групове перейменування.", "https://exocommander.top", "exocommander.top →", "cmd"]]}, "en": {"nav_docs": "Guide", "nav_fb": "Feedback", "fb_btn": "💬 Send feedback", "docs": "guide/", "x_eyebrow": "The Exo family", "x_h2": "More Exo apps", "exo": [["ExoGenerator", "Gamer tags and Wi‑Fi names, company names, readable passwords and a strength check, NATO and Morse. Web, Windows and macOS.", "https://exokey.top/generator/", "Open online →", "gen"], ["ExoCalc", "A notepad calculator: type line by line, see results on the right. Currencies and crypto, units, time and dates, plain words. macOS and Windows.", "https://git.exokey.top/yan/ExoCalc", "Download on git.exokey.top →", "calc"], ["ExoCommander", "A native dual-pane file manager for macOS. F-keys, SFTP, archives, background copy queue, built-in terminal, Multi-Rename.", "https://exocommander.top", "exocommander.top →", "cmd"]]}, "ru": {"nav_docs": "Руководство", "nav_fb": "Отзывы", "fb_btn": "💬 Написать отзыв", "docs": "guide/ru/", "x_eyebrow": "Семейство Exo", "x_h2": "Другие программы Exo", "exo": [["ExoGenerator", "Ники для игр и Wi‑Fi, названия компаний, читаемые пароли и проверка пароля, NATO и Морзе. Онлайн, Windows и macOS.", "https://exokey.top/generator/", "Открыть онлайн →", "gen"], ["ExoCalc", "Калькулятор-блокнот: пишете строку за строкой, результат сразу справа. Валюты и криптовалюты, единицы, время и даты, обычные слова. macOS и Windows.", "https://git.exokey.top/yan/ExoCalc", "Скачать на git.exokey.top →", "calc"], ["ExoCommander", "Нативный двухпанельный файловый менеджер для macOS. F-клавиши, SFTP, архивы, фоновая очередь копирования, встроенный терминал, групповое переименование.", "https://exocommander.top", "exocommander.top →", "cmd"]]}};
 const FAQ_X = {"uk": ["Чим ExoKey відрізняється від інших перемикачів розкладки?", "Він безкоштовний і з відкритим кодом, працює на сучасних Mac з Apple Silicon, знає українську, а підказки ШІ працюють локально, без хмари. Усі можливості описані в Посібнику."], "en": ["How is ExoKey different from other layout switchers?", "It's free and open source, built for modern Apple Silicon Macs, supports Ukrainian, and its AI suggestions run locally with no cloud. Every feature is described in the Guide."], "ru": ["Чем ExoKey отличается от других переключателей раскладки?", "Он бесплатный и с открытым кодом, работает на современных Mac с Apple Silicon, знает украинский, а подсказки ИИ работают локально, без облака. Все возможности описаны в Руководстве."]};
 for (const l in EXTRA) { Object.assign(T[l], EXTRA[l]); T[l].faq = T[l].faq.concat([FAQ_X[l]]); }
 const EXO_ICON = {
+  gen: '<svg viewBox="0 0 56 56" aria-hidden="true"><defs><linearGradient id="exogen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b7fff"/><stop offset="1" stop-color="#2bd3c1"/></linearGradient></defs><rect x="2" y="2" width="52" height="52" rx="14" fill="url(#exogen)"/><text x="28" y="35" font-family="Arial, sans-serif" font-weight="800" font-size="18" text-anchor="middle" fill="#fff">EX</text></svg>',
   calc: '<svg viewBox="0 0 56 56" aria-hidden="true"><rect x="2" y="2" width="52" height="52" rx="14" fill="#57d18b"/><rect x="12" y="11" width="32" height="10" rx="3" fill="#0e1013" opacity=".85"/><g fill="#0e1013" opacity=".85"><rect x="12" y="26" width="8" height="7" rx="2"/><rect x="24" y="26" width="8" height="7" rx="2"/><rect x="36" y="26" width="8" height="7" rx="2"/><rect x="12" y="37" width="8" height="7" rx="2"/><rect x="24" y="37" width="8" height="7" rx="2"/><rect x="36" y="37" width="8" height="7" rx="2"/></g></svg>',
   cmd: '<svg viewBox="0 0 56 56" aria-hidden="true"><rect x="2" y="2" width="52" height="52" rx="14" fill="#337af2"/><rect x="10" y="12" width="17" height="32" rx="3" fill="#fff" opacity=".92"/><rect x="29" y="12" width="17" height="32" rx="3" fill="#fff" opacity=".55"/><g fill="#337af2"><rect x="13" y="17" width="11" height="2.5" rx="1"/><rect x="13" y="23" width="9" height="2.5" rx="1"/><rect x="13" y="29" width="11" height="2.5" rx="1"/></g></svg>',
 };
