@@ -11,7 +11,8 @@
 <meta property="og:title" content="ExoTools — Exo Network Tools">
 <meta property="og:description" content="Ping, traceroute, MTR, Geo MTR, DNS, whois, port scan and speed test in one window. macOS & Windows, open source.">
 <meta property="og:image" content="https://exokey.top/media/exotools/mtr.png">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/media/exotools/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/media/exotools/icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -37,7 +38,9 @@ img { max-width: 100%; display: block; }
 .langs { display: inline-flex; background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
 .langs button { border: 0; background: transparent; color: var(--muted); font: 600 12px/1 var(--font-body); letter-spacing: .06em; padding: 8px 11px; border-radius: 999px; cursor: pointer; }
 .langs button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
-.eyebrow { color: var(--accent); font: 500 13px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; margin-top: 40px; }
+.brand-row { display: flex; align-items: center; gap: 14px; margin-top: 36px; }
+.app-mark { width: 72px; height: 72px; margin: -8px; }
+.eyebrow { color: var(--accent); font: 500 13px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
 h1 { font: 700 clamp(28px, 5.5vw, 48px)/1.12 var(--font-display); margin: 14px 0 14px; text-wrap: balance; }
 h2 { font: 700 clamp(22px, 3.4vw, 28px)/1.25 var(--font-display); margin: 72px 0 8px; text-wrap: balance; }
 h3 { font: 600 18px/1.3 var(--font-body); margin: 0 0 4px; }
@@ -47,13 +50,13 @@ h3 { font: 600 18px/1.3 var(--font-body); margin: 0 0 4px; }
 .btn { display: inline-flex; align-items: center; gap: 8px; border-radius: 12px; padding: 13px 22px; font: 600 16px/1 var(--font-body); text-decoration: none; border: 1px solid var(--line); background: var(--card); }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .note { font-size: 14px; color: var(--muted); }
-.hero-shot { margin-top: 36px; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(0,0,0,.45); background: #f4f6f9; }
+.hero-shot { margin-top: 36px; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(0,0,0,.45); background: #111318; }
 .features { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; margin-top: 22px; }
 .feat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
 .feat p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
 .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr)); gap: 22px; margin-top: 22px; }
 figure { margin: 0; }
-figure a { display: block; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: #f4f6f9; }
+figure a { display: block; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: #111318; }
 figure a:hover { border-color: var(--accent); }
 figcaption { margin-top: 10px; font-size: 15px; color: var(--muted); }
 figcaption b { color: var(--fg); font-weight: 600; }
@@ -82,7 +85,7 @@ dialog img { max-width: 96vw; max-height: 92vh; border-radius: 10px; }
 </header>
 
 <main class="wrap">
-  <div class="eyebrow">ExoTools · Exo Network Tools</div>
+  <div class="brand-row"><img class="app-mark" src="/media/exotools/icon.svg" width="72" height="72" alt="ExoTools"><div class="eyebrow">ExoTools · Exo Network Tools</div></div>
   <h1 data-i="h1">Усі мережеві утиліти в одному вікні</h1>
   <p class="lead" data-i="lead">Ping, traceroute, MTR, Geo MTR з картою маршруту, DNS, NSLookup, whois, сканер портів і тест швидкості. Без командного рядка, без прав адміністратора на macOS. Безкоштовно і з відкритим кодом.</p>
   <div class="cta">
