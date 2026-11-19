@@ -1,5 +1,7 @@
 User-agent: *
 Allow: /
 Disallow: /demo/
+Disallow: /api/
+Disallow: /release-notes/
 
 Sitemap: https://exokey.top/sitemap.xml
