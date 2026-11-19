@@ -34,6 +34,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jandiradmin.exokeymobile
         TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
   ExoKeyMobileUITests:
     type: bundle.ui-testing
     platform: iOS
