@@ -73,6 +73,21 @@ dialog { padding: 0; border: 0; background: transparent; max-width: 96vw; max-he
 dialog::backdrop { background: rgba(0,0,0,.82); }
 dialog img { max-width: 96vw; max-height: 92vh; border-radius: 10px; }
 </style>
+<!-- Matomo -->
+<script>
+  var _paq = window._paq = window._paq || [];
+  /* tracker methods like "setCustomDimension" should be called before "trackPageView" */
+  _paq.push(['trackPageView']);
+  _paq.push(['enableLinkTracking']);
+  (function() {
+    var u="//dredgers.com.ua/stats/";
+    _paq.push(['setTrackerUrl', u+'matomo.php']);
+    _paq.push(['setSiteId', '2']);
+    var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];
+    g.async=true; g.src=u+'matomo.js'; s.parentNode.insertBefore(g,s);
+  })();
+</script>
+<!-- End Matomo Code -->
 </head>
 <body>
 <header class="nav">
