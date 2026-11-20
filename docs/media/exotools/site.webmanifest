@@ -1,0 +1,25 @@
+{
+  "name": "ExoIPtools",
+  "short_name": "ExoIPtools",
+  "icons": [
+    {
+      "src": "/media/exotools/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/media/exotools/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/media/exotools/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "theme_color": "#161A22",
+  "background_color": "#0E1116",
+  "display": "browser", "start_url": "/exotools/"
+}
