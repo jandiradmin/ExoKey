@@ -119,12 +119,34 @@ final class LayoutManager {
         refreshCurrent()
     }
 
-    private func refreshCurrent() {
+    private static func systemID() -> String {
         let src = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
-        if let p = TISGetInputSourceProperty(src, kTISPropertyInputSourceID) {
-            currentID = Unmanaged<CFString>.fromOpaque(p).takeUnretainedValue() as String
+        guard let p = TISGetInputSourceProperty(src, kTISPropertyInputSourceID) else { return "" }
+        return Unmanaged<CFString>.fromOpaque(p).takeUnretainedValue() as String
+    }
+
+    private func refreshCurrent() {
+        currentID = Self.systemID()
+        if let c = all.first(where: { $0.id == currentID }) { layouts[c.lang] = c }
+    }
+
+    private var syncScheduled = false
+
+    /// The system is the only truth: a select can be ignored or undone by macOS without a notification
+    /// (seen on app switches), and a stale `currentID` made ExoKey show and assume the wrong language.
+    /// A mismatch is handled like a change notification, but later on the main queue (no re-entry into the caller).
+    private func realID() -> String {
+        guard Thread.isMainThread else { return currentID }   // TIS calls belong on the main thread
+        let real = Self.systemID()
+        if !real.isEmpty, real != currentID, !syncScheduled {
+            syncScheduled = true
+            Log.write("layout: out of sync, ExoKey had \(currentID), the system has \(real)")
+            DispatchQueue.main.async { [weak self] in
+                self?.syncScheduled = false
+                self?.selectionChanged()
+            }
         }
-        if let c = current { layouts[c.lang] = c }
+        return real.isEmpty ? currentID : real
     }
 
     private func selectionChanged() {
@@ -141,7 +163,10 @@ final class LayoutManager {
     /// Language of the current layout, nil if it is not one of en/ru/uk (or not enabled in the system).
     var currentLang: Lang? { current?.lang }
 
-    var current: KeyLayout? { all.first { $0.id == currentID } }
+    var current: KeyLayout? {
+        let id = realID()
+        return all.first { $0.id == id }
+    }
 
     /// The system's own "select previous / next input source" shortcuts (⌃Space, ⌃⌥Space by default), as set in
     /// System Settings → Keyboard → Shortcuts. They switch the layout and don't edit text.
@@ -165,10 +190,21 @@ final class LayoutManager {
         return out
     }
 
-    func select(_ lang: Lang) {
-        guard let l = layouts[lang], l.id != currentID else { return }
+    func select(_ lang: Lang, retries: Int = 2) {
+        guard let l = layouts[lang], l.id != realID() else { return }
         expectedID = l.id
-        TISSelectInputSource(l.source)
-        currentID = l.id
+        let status = TISSelectInputSource(l.source)
+        currentID = Self.systemID()
+        if currentID != l.id { Log.write("layout: select \(lang.rawValue) not applied (status \(status)), system has \(currentID)") }
+        // check again when macOS settles; the user's own switch or typing since then wins
+        guard retries > 0 else { return }
+        let asked = Date()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            guard let self, Engine.shared.lastUserInput < asked else { return }
+            let real = Self.systemID()
+            guard real != l.id else { return }
+            Log.write("layout: \(lang.rawValue) did not stick (system has \(real)), selecting again")
+            self.select(lang, retries: retries - 1)
+        }
     }
 }
