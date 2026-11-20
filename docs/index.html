@@ -189,6 +189,28 @@ section { padding-block: 84px; }
 .exo h3 { font: 700 19px/1.2 var(--font-display); margin: 2px 0 8px; }
 .exo p { color: var(--muted); margin: 0 0 12px; }
 .exo span { color: var(--accent); font-weight: 600; }
+.dl-note { margin-top: 14px; color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.dl-note a { color: var(--fg); text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+.dl-note a:hover { text-decoration-color: var(--accent); }
+.also { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 26px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-2); color: var(--muted); font-size: 14px; text-decoration: none; }
+.also:hover { border-color: #3c4250; color: var(--fg); }
+.also i { width: 8px; height: 8px; border-radius: 3px; display: inline-block; }
+.also b { color: var(--fg); font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+.family { padding-block: 56px 24px; }
+.family .section-head { margin-bottom: 24px; }
+.fam-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 1000px) { .fam-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .fam-grid { grid-template-columns: minmax(0, 1fr); } }
+.fam { display: flex; flex-direction: column; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; box-shadow: 0 4px 0 #0a0b0d; min-width: 0; }
+.fam-head { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 12px; align-items: center; }
+.fam-head svg, .fam-head img { width: 48px; height: 48px; display: block; }
+.fam h3 { font: 700 17px/1.2 var(--font-display); }
+.fam .plat { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.fam p { color: var(--muted); font-size: 15px; line-height: 1.5; }
+.fam-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 4px; }
+.btn-sm { padding: 9px 13px; font-size: 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-2); color: var(--fg); }
+.btn-sm:hover { border-color: var(--accent); }
+.btn-sm.main { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
 footer { border-top: 1px solid var(--line); padding-block: 30px calc(30px + env(safe-area-inset-bottom, 0px)); color: var(--muted); font-size: 14px; }
 footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
 footer a { color: var(--muted); text-decoration: none; }
@@ -267,7 +289,7 @@ footer a:hover { color: var(--fg); }
         <h1><span class="type">ghbdsn</span><br><span data-i="h1">Пишіть, не дивлячись на розкладку</span></h1>
         <p class="lead" data-i="lead">ExoKey сам виправляє текст, набраний не тією мовою, ловить помилки й підказує наступні слова. Англійська, українська, російська. Усе працює на вашому Mac.</p>
         <div class="cta">
-          <a class="btn btn-primary" href="https://git.exokey.top/yan/ExoKey/releases/latest" data-dl="hero">
+          <a class="btn btn-primary" href="https://github.com/jandiradmin/ExoKey/releases/download/v0.2.1/ExoKey-0.2.1.zip" data-dl="hero">
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1Zm-7 15a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg>
             <span data-i="cta_dl">Завантажити для Mac</span>
           </a>
@@ -276,7 +298,9 @@ footer a:hover { color: var(--fg); }
             <span data-i="code">Код</span>
           </a>
         </div>
+        <p class="dl-note"><span data-i="dl_ver">Версія 0.2.1 · ZIP, 12 МБ</span><a href="#install" data-i="dl_how">Як встановити</a><a href="#install" data-i="dl_brew">Homebrew</a><a href="https://git.exokey.top/yan/ExoKey/releases" data-i="dl_all">Усі версії</a></p>
         <div class="meta"><span data-i="m1">macOS 13+, Apple Silicon</span><span data-i="m2">Без хмари</span><span data-i="m3">Ліцензія MIT</span></div>
+        <a class="also" href="#exo"><span data-i="also">Також від Exo:</span> <b><i style="background:#57d18b"></i>ExoCalc</b> <b><i style="background:#337af2"></i>ExoCommander</b> <b><i style="background:#ffc93d"></i>ExoTools</b> <b><i style="background:#FF5CA8"></i>ExoGenerator</b> ↓</a>
       </div>
       <div class="demo"><img id="demo" src="media/demo-uk.gif" width="760" height="660" alt="Демонстрація ExoKey" data-i-alt="demo_alt"></div>
     </div>
@@ -285,6 +309,16 @@ footer a:hover { color: var(--fg); }
   <div class="strip" aria-hidden="true">
     <div class="row" id="strip"></div>
   </div>
+
+  <section class="family" id="exo">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="eyebrow" data-i="x_eyebrow">Родина Exo</div>
+        <h2 data-i="x_h2">Інші програми Exo</h2>
+      </div>
+      <div class="fam-grid" id="exolist"></div>
+    </div>
+  </section>
 
   <section id="features">
     <div class="wrap">
@@ -345,22 +379,13 @@ brew install --cask exokey</pre>
     </div>
   </section>
 
-  <section id="exo" style="padding-top:0">
-    <div class="wrap">
-      <div class="section-head">
-        <div class="eyebrow" data-i="x_eyebrow">Родина Exo</div>
-        <h2 data-i="x_h2">Інші програми Exo</h2>
-      </div>
-      <div class="exo-grid" id="exolist"></div>
-    </div>
-  </section>
 
   <section class="final">
     <div class="wrap">
       <h2 data-i="final_h2">Спробуйте ExoKey</h2>
       <p data-i="final_p">Безкоштовно. Якщо ExoKey вам знадобився, розкажіть про нього друзям — це допомагає проєкту рости.</p>
       <div class="cta">
-        <a class="btn btn-primary" href="https://git.exokey.top/yan/ExoKey/releases/latest" data-dl="bottom" data-i="cta_dl2">Завантажити для Mac</a>
+        <a class="btn btn-primary" href="https://github.com/jandiradmin/ExoKey/releases/download/v0.2.1/ExoKey-0.2.1.zip" data-dl="bottom" data-i="cta_dl2">Завантажити для Mac</a>
         <a class="btn btn-ghost" href="https://git.exokey.top/yan/ExoKey" data-i="star">Вихідний код</a>
         <a class="btn btn-ghost" href="https://paypal.me/YanHordashevskyy" data-dl="donate" data-i="donate">☕ Підтримати</a>
         <a class="btn btn-ghost" href="feedback/?product=exokey" data-i="fb_btn">💬 Написати відгук</a>
@@ -531,10 +556,11 @@ const T = {
   },
 };
 
-const EXTRA = {"uk": {"nav_docs": "Посібник", "nav_fb": "Відгуки", "fb_btn": "💬 Написати відгук", "docs": "guide/uk/", "x_eyebrow": "Родина Exo", "x_h2": "Інші програми Exo", "exo": [["ExoGenerator", "Ніки для ігор і Wi‑Fi, назви компаній, читабельні паролі й перевірка пароля, NATO і Морзе. Онлайн, Windows і macOS.", "https://exokey.top/generator/", "Відкрити онлайн →", "gen"], ["ExoCalc", "Калькулятор-блокнот: пишете рядок за рядком, результат одразу праворуч. Валюти й криптовалюти, одиниці, час і дати, звичайні слова. macOS і Windows.", "https://git.exokey.top/yan/ExoCalc", "Завантажити на git.exokey.top →", "calc"], ["ExoCommander", "Нативний двопанельний файловий менеджер для macOS. F-клавіші, SFTP, архіви, фонова черга копіювання, вбудований термінал, групове перейменування.", "https://exocommander.top", "exocommander.top →", "cmd"]]}, "en": {"nav_docs": "Guide", "nav_fb": "Feedback", "fb_btn": "💬 Send feedback", "docs": "guide/", "x_eyebrow": "The Exo family", "x_h2": "More Exo apps", "exo": [["ExoGenerator", "Gamer tags and Wi‑Fi names, company names, readable passwords and a strength check, NATO and Morse. Web, Windows and macOS.", "https://exokey.top/generator/", "Open online →", "gen"], ["ExoCalc", "A notepad calculator: type line by line, see results on the right. Currencies and crypto, units, time and dates, plain words. macOS and Windows.", "https://git.exokey.top/yan/ExoCalc", "Download on git.exokey.top →", "calc"], ["ExoCommander", "A native dual-pane file manager for macOS. F-keys, SFTP, archives, background copy queue, built-in terminal, Multi-Rename.", "https://exocommander.top", "exocommander.top →", "cmd"]]}, "ru": {"nav_docs": "Руководство", "nav_fb": "Отзывы", "fb_btn": "💬 Написать отзыв", "docs": "guide/ru/", "x_eyebrow": "Семейство Exo", "x_h2": "Другие программы Exo", "exo": [["ExoGenerator", "Ники для игр и Wi‑Fi, названия компаний, читаемые пароли и проверка пароля, NATO и Морзе. Онлайн, Windows и macOS.", "https://exokey.top/generator/", "Открыть онлайн →", "gen"], ["ExoCalc", "Калькулятор-блокнот: пишете строку за строкой, результат сразу справа. Валюты и криптовалюты, единицы, время и даты, обычные слова. macOS и Windows.", "https://git.exokey.top/yan/ExoCalc", "Скачать на git.exokey.top →", "calc"], ["ExoCommander", "Нативный двухпанельный файловый менеджер для macOS. F-клавиши, SFTP, архивы, фоновая очередь копирования, встроенный терминал, групповое переименование.", "https://exocommander.top", "exocommander.top →", "cmd"]]}};
+const EXTRA = {"uk": {"nav_docs": "Посібник", "nav_fb": "Відгуки", "fb_btn": "💬 Написати відгук", "docs": "guide/uk/", "x_eyebrow": "Родина Exo", "x_h2": "Ще програми Exo, теж безкоштовні", "exo": [["ExoCalc", "macOS · Windows", "Калькулятор-блокнот: пишете рядками, результат одразу праворуч. Валюти, одиниці, час і дати.", "calc", [["Mac", "https://git.exokey.top/yan/ExoCalc/releases/download/v1.3.3/ExoCalc-macOS.zip", 1], ["Windows", "https://git.exokey.top/yan/ExoCalc/releases/download/v1.3.3/ExoCalc_1.3.3_x64-setup.exe", 1], ["Код", "https://git.exokey.top/yan/ExoCalc", 0]]], ["ExoCommander", "macOS", "Двопанельний файловий менеджер для Mac: F-клавіші, SFTP, архіви, черга копіювання, термінал.", "cmd", [["Завантажити", "https://exocommander.top", 1]]], ["ExoTools", "macOS · Windows", "Ping, traceroute, MTR, DNS, whois, сканер портів і тест швидкості в одному вікні.", "tools", [["Детальніше й завантажити", "/exotools/", 1]]], ["ExoGenerator", "Онлайн · Windows · macOS", "Ніки для ігор і Wi‑Fi, назви компаній, читабельні паролі й перевірка пароля.", "gen", [["Відкрити онлайн", "/generator/", 1]]]], "also": "Також від Exo:", "dl_ver": "Версія 0.2.1 · ZIP, 12 МБ", "dl_how": "Як встановити", "dl_brew": "Homebrew", "dl_all": "Усі версії"}, "en": {"nav_docs": "Guide", "nav_fb": "Feedback", "fb_btn": "💬 Send feedback", "docs": "guide/", "x_eyebrow": "The Exo family", "x_h2": "More Exo apps, also free", "exo": [["ExoCalc", "macOS · Windows", "A notepad calculator: type line by line, see results on the right. Currencies, units, time and dates.", "calc", [["Mac", "https://git.exokey.top/yan/ExoCalc/releases/download/v1.3.3/ExoCalc-macOS.zip", 1], ["Windows", "https://git.exokey.top/yan/ExoCalc/releases/download/v1.3.3/ExoCalc_1.3.3_x64-setup.exe", 1], ["Code", "https://git.exokey.top/yan/ExoCalc", 0]]], ["ExoCommander", "macOS", "A dual-pane file manager for Mac: F-keys, SFTP, archives, copy queue, terminal.", "cmd", [["Download", "https://exocommander.top", 1]]], ["ExoTools", "macOS · Windows", "Ping, traceroute, MTR, DNS, whois, port scan and speed test in one window.", "tools", [["Details & download", "/exotools/", 1]]], ["ExoGenerator", "Web · Windows · macOS", "Gamer tags and Wi‑Fi names, company names, readable passwords and a strength check.", "gen", [["Open online", "/generator/", 1]]]], "also": "Also from Exo:", "dl_ver": "Version 0.2.1 · ZIP, 12 MB", "dl_how": "How to install", "dl_brew": "Homebrew", "dl_all": "All versions"}, "ru": {"nav_docs": "Руководство", "nav_fb": "Отзывы", "fb_btn": "💬 Написать отзыв", "docs": "guide/ru/", "x_eyebrow": "Семейство Exo", "x_h2": "Ещё программы Exo, тоже бесплатные", "exo": [["ExoCalc", "macOS · Windows", "Калькулятор-блокнот: пишете строками, результат сразу справа. Валюты, единицы, время и даты.", "calc", [["Mac", "https://git.exokey.top/yan/ExoCalc/releases/download/v1.3.3/ExoCalc-macOS.zip", 1], ["Windows", "https://git.exokey.top/yan/ExoCalc/releases/download/v1.3.3/ExoCalc_1.3.3_x64-setup.exe", 1], ["Код", "https://git.exokey.top/yan/ExoCalc", 0]]], ["ExoCommander", "macOS", "Двухпанельный файловый менеджер для Mac: F-клавиши, SFTP, архивы, очередь копирования, терминал.", "cmd", [["Скачать", "https://exocommander.top", 1]]], ["ExoTools", "macOS · Windows", "Ping, traceroute, MTR, DNS, whois, сканер портов и тест скорости в одном окне.", "tools", [["Подробнее и скачать", "/exotools/", 1]]], ["ExoGenerator", "Онлайн · Windows · macOS", "Ники для игр и Wi‑Fi, названия компаний, читаемые пароли и проверка пароля.", "gen", [["Открыть онлайн", "/generator/", 1]]]], "also": "Также от Exo:", "dl_ver": "Версия 0.2.1 · ZIP, 12 МБ", "dl_how": "Как установить", "dl_brew": "Homebrew", "dl_all": "Все версии"}};
 const FAQ_X = {"uk": ["Чим ExoKey відрізняється від інших перемикачів розкладки?", "Він безкоштовний і з відкритим кодом, працює на сучасних Mac з Apple Silicon, знає українську, а підказки ШІ працюють локально, без хмари. Усі можливості описані в Посібнику."], "en": ["How is ExoKey different from other layout switchers?", "It's free and open source, built for modern Apple Silicon Macs, supports Ukrainian, and its AI suggestions run locally with no cloud. Every feature is described in the Guide."], "ru": ["Чем ExoKey отличается от других переключателей раскладки?", "Он бесплатный и с открытым кодом, работает на современных Mac с Apple Silicon, знает украинский, а подсказки ИИ работают локально, без облака. Все возможности описаны в Руководстве."]};
 for (const l in EXTRA) { Object.assign(T[l], EXTRA[l]); T[l].faq = T[l].faq.concat([FAQ_X[l]]); }
 const EXO_ICON = {
+  tools: '<img src="/media/exotools/icon.svg" alt="" width="48" height="48">',
   gen: '<svg viewBox="0 0 56 56" aria-hidden="true"><rect x="1" y="1" width="54" height="54" rx="14" fill="#161A22" stroke="#2E3440" stroke-width="1.5"/><g transform="translate(7 7) scale(.35)"><path d="M86 10 H38 A28 28 0 0 0 10 38 V82 A28 28 0 0 0 38 110 H82 A28 28 0 0 0 110 82 V34" fill="none" stroke="#F2F4F8" stroke-width="12" stroke-linecap="round"/><circle cx="101" cy="19" r="8" fill="#FF5CA8"/><g transform="translate(60 60) scale(1.68) translate(-60 -60)"><path d="M60 38 C62 52 68 58 82 60 C68 62 62 68 60 82 C58 68 52 62 38 60 C52 58 58 52 60 38 Z" fill="#FF5CA8"/></g></g></svg>',
   calc: '<svg viewBox="0 0 56 56" aria-hidden="true"><rect x="2" y="2" width="52" height="52" rx="14" fill="#57d18b"/><rect x="12" y="11" width="32" height="10" rx="3" fill="#0e1013" opacity=".85"/><g fill="#0e1013" opacity=".85"><rect x="12" y="26" width="8" height="7" rx="2"/><rect x="24" y="26" width="8" height="7" rx="2"/><rect x="36" y="26" width="8" height="7" rx="2"/><rect x="12" y="37" width="8" height="7" rx="2"/><rect x="24" y="37" width="8" height="7" rx="2"/><rect x="36" y="37" width="8" height="7" rx="2"/></g></svg>',
   cmd: '<svg viewBox="0 0 56 56" aria-hidden="true"><rect x="2" y="2" width="52" height="52" rx="14" fill="#337af2"/><rect x="10" y="12" width="17" height="32" rx="3" fill="#fff" opacity=".92"/><rect x="29" y="12" width="17" height="32" rx="3" fill="#fff" opacity=".55"/><g fill="#337af2"><rect x="13" y="17" width="11" height="2.5" rx="1"/><rect x="13" y="23" width="9" height="2.5" rx="1"/><rect x="13" y="29" width="11" height="2.5" rx="1"/></g></svg>',
@@ -563,8 +589,9 @@ function apply(lang) {
   document.getElementById("keyrows").innerHTML = L.keys.map(([a, k]) =>
     `<tr><td>${esc(a)}</td><td>${k.split(" / ").map(g => g.split(" ").map(x => `<span class="k">${esc(x)}</span>`).join(" ")).join(" / ")}</td></tr>`).join("");
   document.getElementById("faqlist").innerHTML = L.faq.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("");
-  document.getElementById("exolist").innerHTML = L.exo.map(([n, d, u, t, ic]) =>
-    `<a class="exo" href="${u}" data-promo="${n}">${EXO_ICON[ic]}<div><h3>${n}</h3><p>${esc(d)}</p><span>${esc(t)}</span></div></a>`).join("");
+  document.getElementById("exolist").innerHTML = L.exo.map(([n, plat, d, ic, acts]) =>
+    `<article class="fam"><div class="fam-head">${EXO_ICON[ic]}<div><h3>${n}</h3><div class="plat">${esc(plat)}</div></div></div><p>${esc(d)}</p>` +
+    `<div class="fam-acts">${acts.map(([lbl, u, main]) => `<a class="btn btn-sm${main ? " main" : ""}" href="${u}" data-promo="${n}">${esc(lbl)}</a>`).join("")}</div></article>`).join("");
   document.getElementById("docslink").href = L.docs;
   document.getElementById("docslink2").href = L.docs;
   const items = L.strip.map(([a, b]) => `<span>${esc(a)}<i>→</i><b>${esc(b)}</b></span>`).join("");
